@@ -1,4 +1,4 @@
-use std::{borrow::Borrow, collections::HashMap, ops::Deref, rc::Rc};
+use std::{borrow::Borrow, cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
 use http::{header, HeaderMap, StatusCode};
 use wasm_bindgen::JsValue;
@@ -74,6 +74,14 @@ async fn login(params_json: &Value) -> Option<User> {
                 //    token: "tok".to_owned()
                 //})});
                 let user = response.json::<User>().await.expect("err");
+                let local_storage = web_sys::window()
+                .and_then(|win| win.local_storage().ok())
+                .and_then(|storage| storage)
+                .expect("LocalStorage is not available");
+                let user_json = serde_json::to_string(&user).expect("Failed to serialize user to JSON");
+                local_storage
+                    .set_item("user", &user_json)
+                    .expect("Failed to set item in localStorage");
                 return Some(user);
             } else {
                 clog!("Non-ok status");
@@ -234,7 +242,7 @@ enum AuthAction {
     True,
     False,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct User {
     id: u32,
     username: String,
@@ -336,16 +344,50 @@ type UserStateContext = UseReducerHandle<UserState>;
 
 #[function_component(App)]
 pub fn app() -> Html {
-    let theme_ctx = use_state(|| Theme {
-        foreground: "#000000".to_owned(),
-        background: "#eeeeee".to_owned(),
-    });
-    let fallback = html! {
-        <li><Link<Route> to={Route::EditorLogin}>{"Editor Login"}</Link<Route>></li>
-    };
-    let has_user_state = use_reducer(|| HasUser::default());
-    let user_state = use_reducer(|| UserState {has_user:None});
+    clog!("start up");
+    let local_storage = web_sys::window()
+    .and_then(|win| win.local_storage().ok())
+    .and_then(|storage| storage)
+    .expect("LocalStorage is not available");
+    let local_storage_user = local_storage
+        .get_item("user")
+        .expect("Failed to get item from localStorage");
 
+    let user_state = use_reducer(|| UserState {has_user: None});
+    
+    if let Some(user_data) = local_storage_user {
+        let match_user_data: Result<Option<User>, serde_json::Error> = serde_json::from_str(&user_data);
+        let user_state_contexta = user_state.clone();
+        match match_user_data {
+            Ok(data) => {
+                spawn_local(async move {
+                    let user_state_contextb = user_state_contexta.clone();
+                    let url_str = "http://127.0.0.2:8081/editor/reauth";
+                    let req = reqwasm::http::Request::post(url_str)
+                    .header("content-type", "applcation/json")
+                    .body(user_data)
+                    .send()
+                    .await;
+                    match req {
+                        Ok(response) => {
+                            if response.status_text() == "OK" {
+                                user_state_contextb.dispatch(data)
+                            } else {
+                                user_state_contextb.dispatch(None)
+                            }
+                        },
+                        Err(_) => {
+                            user_state_contextb.dispatch(None)
+                        }
+                    };
+                });
+            },
+            Err(_) => {
+                user_state_contexta.dispatch(None)
+            },
+        };
+    };
+    
     
     html! {
         <ContextProvider<UserStateContext> context={user_state}>
