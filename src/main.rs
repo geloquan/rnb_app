@@ -55,7 +55,6 @@ async fn login(params_json: &Value) -> Option<User> {
     let req = reqwasm::http::Request::post(url_str)
     .header("content-type", "applcation/json")
     .body(params_json.to_string())
-    .mode(reqwasm::http::RequestMode::NoCors)
     .send()
     .await;
     clog!(format!("req: {:?}", req));
