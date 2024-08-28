@@ -340,6 +340,11 @@ struct AppProp {
     user_auth: UseReducerHandle<HasUser>
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+struct AppState {
+    loaded: bool
+}
+
 type UserStateContext = UseReducerHandle<UserState>;
 
 #[function_component(App)]
@@ -352,46 +357,138 @@ pub fn app() -> Html {
     let local_storage_user = local_storage
         .get_item("user")
         .expect("Failed to get item from localStorage");
+    let local_storage_loaded = local_storage
+        .get_item("loaded")
+        .expect("Failed to get item from localStorage");
+    match local_storage.remove_item("loaded") {
+        Ok(_) => {
+            // Successfully removed the item
+        },
+        Err(err) => {
+            // Handle the error
+        },
+    }
 
     let user_state = use_reducer(|| UserState {has_user: None});
     
-    if let Some(user_data) = local_storage_user {
-        let match_user_data: Result<Option<User>, serde_json::Error> = serde_json::from_str(&user_data);
-        let user_state_contexta = user_state.clone();
-        match match_user_data {
-            Ok(data) => {
-                spawn_local(async move {
-                    let user_state_contextb = user_state_contexta.clone();
-                    let url_str = "http://127.0.0.2:8081/editor/reauth";
-                    let req = reqwasm::http::Request::post(url_str)
-                    .header("content-type", "applcation/json")
-                    .body(user_data)
-                    .send()
-                    .await;
-                    match req {
-                        Ok(response) => {
-                            if response.status_text() == "OK" {
-                                user_state_contextb.dispatch(data)
-                            } else {
-                                user_state_contextb.dispatch(None)
+
+    let onload = {
+        clog!("onload()");
+        let local_storage = local_storage.clone();
+        let local_storage_loaded = local_storage_loaded.clone();
+        let has_user_ctx = user_state.clone();
+        match local_storage_loaded {
+            Some(loaded) => {
+                clog!("Some(loaded)");
+                let match_loaded_data: Result<AppState, serde_json::Error> = serde_json::from_str(&loaded);
+                match match_loaded_data {
+                    Ok(app_state) => {
+                        match app_state.loaded {
+                            true => {
+                                clog!("true");
+                                
+                            },
+                            false => {
+                                clog!("false");
+                                if let Some(user_data) = local_storage_user {
+                                    let match_user_data: Result<Option<User>, serde_json::Error> = serde_json::from_str(&user_data);
+                                    let user_state_contexta = has_user_ctx.clone();
+                                    match match_user_data {
+                                        Ok(data) => {
+                                            spawn_local(async move {
+                                                let user_state_contextb = user_state_contexta.clone();
+                                                let url_str = "http://127.0.0.2:8081/editor/reauth";
+                                                let req = reqwasm::http::Request::post(url_str)
+                                                .header("content-type", "applcation/json")
+                                                .body(user_data)
+                                                .send()
+                                                .await;
+                                                match req {
+                                                    Ok(response) => {
+                                                        if response.status_text() == "OK" {
+                                                            user_state_contextb.dispatch(data)
+                                                        } else {
+                                                            user_state_contextb.dispatch(None)
+                                                        }
+                                                    },
+                                                    Err(_) => {
+                                                        user_state_contextb.dispatch(None)
+                                                    }
+                                                };
+                                            });
+                                        },
+                                        Err(_) => {
+                                            user_state_contexta.dispatch(None)
+                                        },
+                                    };
+                                };
+                                let app_state = AppState { loaded: true };
+                                local_storage
+                                .set_item("loaded", &serde_json::to_string(&app_state).unwrap())
+                                .expect("Failed to set item in localStorage");
                             }
+                        }
+                    },
+                    Err(e) => {
+                    }
+                }
+            },
+            None => {
+                clog!("None(loaded)");
+                if let Some(user_data) = local_storage_user {
+                    let match_user_data: Result<Option<User>, serde_json::Error> = serde_json::from_str(&user_data);
+                    let user_state_contexta = has_user_ctx.clone();
+                    match match_user_data {
+                        Ok(data) => {
+                            clog!("Ok(data)");
+                            spawn_local(async move {
+                                let user_state_contextb = user_state_contexta.clone();
+                                let url_str = "http://127.0.0.2:8081/editor/reauth";
+                                let req = reqwasm::http::Request::post(url_str)
+                                .header("content-type", "applcation/json")
+                                .body(user_data)
+                                .send()
+                                .await;
+                                match req {
+                                    Ok(response) => {
+                                        clog!("Ok(response)");
+                                        if response.status_text() == "OK" {
+                                            user_state_contextb.dispatch(data)
+                                        } else {
+                                            user_state_contextb.dispatch(None)
+                                        }
+                                    },
+                                    Err(_) => {
+                                        clog!("Err(response)");
+                                        user_state_contextb.dispatch(None)
+                                    }
+                                };
+                            });
                         },
                         Err(_) => {
-                            user_state_contextb.dispatch(None)
-                        }
+                            clog!("Err(data)");
+                            user_state_contexta.dispatch(None)
+                        },
                     };
-                });
-            },
-            Err(_) => {
-                user_state_contexta.dispatch(None)
-            },
-        };
+                };
+                let app_state = AppState { loaded: true };
+                local_storage
+                .set_item("loaded", &serde_json::to_string(&app_state).unwrap())
+                .expect("Failed to set item in localStorage");
+            }
+        }
+        //let has_user_ctx = user_state.clone();
+        Callback::from(|_| {
+            clog!("onload() callback");
+            //let has_user_ctx = has_user_ctx.clone();
+            //let local_storage_user = local_storage_user.clone();
+        })
     };
     
-    
     html! {
+    <>
         <ContextProvider<UserStateContext> context={user_state}>
-        <div>
+        <div {onload}>
             <BrowserRouter>
             <nav>
                 <ul>
@@ -405,6 +502,7 @@ pub fn app() -> Html {
             </BrowserRouter>
         </div>
         </ContextProvider<UserStateContext>>
+    </>
     }
 }
 
