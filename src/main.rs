@@ -626,126 +626,101 @@ pub fn app() -> Html {
 fn main() {
     yew::Renderer::<App>::new().render();
 }
-
-#[derive(Clone, Debug)]
-pub struct Entity {
-    name: String,
-    pub svg_content: Option<String>,
-    pub filter_options: Option<Node>,
-    pub classes: Option<HashMap<(String, String), bool>>,
-    pub data_name: Option<HashMap<String, bool>>,
-    pub filter_actions: Option<String>,
-    pub edit_mode: bool,
-    pub default_floor: String
-}
-impl Entity {
-    pub fn new() -> Self {
-        println!("Entity new()");
-        Entity {
-            name: "".to_string(),
-            svg_content: None,
-            filter_options: None,
-            classes: None,
-            data_name: None,
-            filter_actions: None,
-            edit_mode: false,
-            default_floor: "".to_string(),
-        }
-    }
-    fn join_classes(&mut self, id_vec: Vec<(String, String)>) {
-        if let Some(ref mut classes) = self.classes {
-            for id in id_vec.into_iter() {
-                classes.insert(id, true);
-            }
-        } else {
-            let mut new_classes = HashMap::new();
-            for id in id_vec.into_iter() {
-                new_classes.insert(id, true);
-            }
-            self.classes = Some(new_classes);
-        }
-    }
-    fn join_data_name(&mut self, id_vec: Vec<String>) {
-        if let Some(ref mut data_name) = self.data_name {
-            for id in id_vec.into_iter() {
-                data_name.insert(id, true);
-            }
-        } else {
-            let mut new_data_name = HashMap::new();
-            for id in id_vec.into_iter() {
-                new_data_name.insert(id, true);
-            }
-            self.data_name = Some(new_data_name);
-        }
-    }
-    fn option_element(&mut self) {
-        let div: Element = document().create_element("div").unwrap();
-        let select_x: Element = document().create_element("select").unwrap();
-        let select_y: Element = document().create_element("select").unwrap();
-
-        let mut x_cache: Vec<&str> = Vec::new();
-        let mut y_cache: Vec<&str> = Vec::new();
-        
-        match &self.classes {
-            Some(classes) => {
-                let mut y_items: Vec<String> = Vec::new();
-                for (class, _) in classes {
-                    let class_name = &class.0;
-                    
-                    if class_name.contains("floor") && !y_cache.contains(&class_name.as_str()) {
-                        y_items.push(class_name.clone());
-                        y_cache.push(class_name.as_str());
-                    }
-
-                    if class.0 == self.default_floor && !x_cache.contains(&class.1.as_str()) {
-                        let option: Element = document().create_element("option").unwrap();
-                        option.set_node_value(Some(class.1.as_str()));
-                        option.set_text_content(Some(class.1.as_str()));
-                        let option_node: Node = option.into();
-                        let _ = select_x.append_child(&option_node);
-                        x_cache.push(&class.1.as_str());
-                    }
-                }
-                
-                y_items.sort();
-                for item in y_items {
-                    let option: Element = document().create_element("option").unwrap();
-                    option.set_node_value(Some(item.as_str()));
-                    option.set_text_content(Some(item.as_str()));
-                    let option_node: Node = option.into();
-                    let _ = select_y.append_child(&option_node);
-                }
-            },
-            None => {
-            }
-        }
-        
-        let node: Node = div.into();
-        self.filter_options = Some(node);
-    }
-    pub fn option_listeners(&mut self) {
-        let tera = Tera::new("templates/**/*").expect("Failed to initialize Tera");
-        
-        let mut context = Context::new();
-        context.insert(
-            "options",
-            &self.classes
-                .as_ref()
-                .map_or(Vec::new(), |classes| classes.keys().cloned().collect::<Vec<_>>())
-        );
-        let mut y_rendered_cases = Context::new();
-        let y_rendered_cases = tera.render("y_option_listener.js", &context).expect("Failed to render template");
-        let mut x_rendered_cases = Context::new();
-        let x_rendered_cases = tera.render("x_option_listener.js", &context).expect("Failed to render template");
-
-        let mut filter_context = Context::new();
-        filter_context.insert("x_cases", &x_rendered_cases);
-        filter_context.insert("y_cases", &y_rendered_cases);
-        filter_context.insert("options", &self.classes
-        .as_ref()
-        .map_or(Vec::new(), |classes| classes.keys().cloned().collect::<Vec<_>>()));
-
-        let rendered_listeners = tera.render("filter_listeners.js", &filter_context).expect("Failed to render template");
-        self.filter_actions = Some(rendered_listeners);
-    }
-}
+//
+//fn join_classes(&mut self, id_vec: Vec<(String, String)>) {fn join_classes(&mut self, id_vec: Vec<(String, String)>) {
+//    if let Some(ref mut classes) = self.classes {    if let Some(ref mut classes) = self.classes {
+//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
+//            classes.insert(id, true);            classes.insert(id, true);
+//        }        }
+//    } else {    } else {
+//        let mut new_classes = HashMap::new();        let mut new_classes = HashMap::new();
+//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
+//            new_classes.insert(id, true);            new_classes.insert(id, true);
+//        }        }
+//        self.classes = Some(new_classes);        self.classes = Some(new_classes);
+//    }    }
+//}}
+//fn join_data_name(&mut self, id_vec: Vec<String>) {fn join_data_name(&mut self, id_vec: Vec<String>) {
+//    if let Some(ref mut data_name) = self.data_name {    if let Some(ref mut data_name) = self.data_name {
+//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
+//            data_name.insert(id, true);            data_name.insert(id, true);
+//        }        }
+//    } else {    } else {
+//        let mut new_data_name = HashMap::new();        let mut new_data_name = HashMap::new();
+//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
+//            new_data_name.insert(id, true);            new_data_name.insert(id, true);
+//        }        }
+//        self.data_name = Some(new_data_name);        self.data_name = Some(new_data_name);
+//    }    }
+//}}
+//#[derive(Clone, Debug)]#[derive(Clone, Debug)]
+//pub struct Entity {pub struct Entity {
+//    name: String,    name: String,
+//    pub svg_content: Option<String>,    pub svg_content: Option<String>,
+//    pub filter_options: Option<Node>,    pub filter_options: Option<Node>,
+//    pub classes: Option<HashMap<(String, String), bool>>,    pub classes: Option<HashMap<(String, String), bool>>,
+//    pub data_name: Option<HashMap<String, bool>>,    pub data_name: Option<HashMap<String, bool>>,
+//    pub filter_actions: Option<String>,    pub filter_actions: Option<String>,
+//    pub edit_mode: bool,    pub edit_mode: bool,
+//    pub default_floor: String    pub default_floor: String
+//}}
+//impl Entity {impl Entity {
+//    pub fn new() -> Self {    pub fn new() -> Self {
+//        println!("Entity new()");        println!("Entity new()");
+//        Entity {        Entity {
+//            name: "".to_string(),            name: "".to_string(),
+//            svg_content: None,            svg_content: None,
+//            filter_options: None,            filter_options: None,
+//            classes: None,            classes: None,
+//            data_name: None,            data_name: None,
+//            filter_actions: None,            filter_actions: None,
+//            edit_mode: false,            edit_mode: false,
+//            default_floor: "".to_string(),            default_floor: "".to_string(),
+//        }        }
+//    }    }
+//    fn option_element(&mut self) {    fn option_element(&mut self) {
+//        let div: Element = document().create_element("div").unwrap();        let div: Element = document().create_element("div").unwrap();
+//        let select_x: Element = document().create_element("select").unwrap();        let select_x: Element = document().create_element("select").unwrap();
+//        let select_y: Element = document().create_element("select").unwrap();        let select_y: Element = document().create_element("select").unwrap();
+//
+//        let mut x_cache: Vec<&str> = Vec::new();        let mut x_cache: Vec<&str> = Vec::new();
+//        let mut y_cache: Vec<&str> = Vec::new();        let mut y_cache: Vec<&str> = Vec::new();
+//                
+//        match &self.classes {        match &self.classes {
+//            Some(classes) => {            Some(classes) => {
+//                let mut y_items: Vec<String> = Vec::new();                let mut y_items: Vec<String> = Vec::new();
+//                for (class, _) in classes {                for (class, _) in classes {
+//                    let class_name = &class.0;                    let class_name = &class.0;
+//                                        
+//                    if class_name.contains("floor") && !y_cache.contains(&class_name.as_str()) {                    if class_name.contains("floor") && !y_cache.contains(&class_name.as_str()) {
+//                        y_items.push(class_name.clone());                        y_items.push(class_name.clone());
+//                        y_cache.push(class_name.as_str());                        y_cache.push(class_name.as_str());
+//                    }                    }
+//
+//                    if class.0 == self.default_floor && !x_cache.contains(&class.1.as_str()) {                    if class.0 == self.default_floor && !x_cache.contains(&class.1.as_str()) {
+//                        let option: Element = document().create_element("option").unwrap();                        let option: Element = document().create_element("option").unwrap();
+//                        option.set_node_value(Some(class.1.as_str()));                        option.set_node_value(Some(class.1.as_str()));
+//                        option.set_text_content(Some(class.1.as_str()));                        option.set_text_content(Some(class.1.as_str()));
+//                        let option_node: Node = option.into();                        let option_node: Node = option.into();
+//                        let _ = select_x.append_child(&option_node);                        let _ = select_x.append_child(&option_node);
+//                        x_cache.push(&class.1.as_str());                        x_cache.push(&class.1.as_str());
+//                    }                    }
+//                }                }
+//                                
+//                y_items.sort();                y_items.sort();
+//                for item in y_items {                for item in y_items {
+//                    let option: Element = document().create_element("option").unwrap();                    let option: Element = document().create_element("option").unwrap();
+//                    option.set_node_value(Some(item.as_str()));                    option.set_node_value(Some(item.as_str()));
+//                    option.set_text_content(Some(item.as_str()));                    option.set_text_content(Some(item.as_str()));
+//                    let option_node: Node = option.into();                    let option_node: Node = option.into();
+//                    let _ = select_y.append_child(&option_node);                    let _ = select_y.append_child(&option_node);
+//                }                }
+//            },            },
+//            None => {            None => {
+//            }            }
+//        }        }
+//                
+//        let node: Node = div.into();        let node: Node = div.into();
+//        self.filter_options = Some(node);        self.filter_options = Some(node);
+//    }    }
+//}}
