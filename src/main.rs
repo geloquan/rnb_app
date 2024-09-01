@@ -17,6 +17,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use regex::Regex;
 
+mod entity;
+
+use entity::*;
+
 #[derive(Properties, PartialEq, Clone)]
 struct SessionToken {
     value: String
@@ -108,7 +112,6 @@ fn editor_dashboard() -> Html {
     html! {
     <>
         <div>{"hello from dashboard"}</div>
-
     </>
     }
 }
@@ -117,6 +120,7 @@ struct CodeProp {
     code: String
 }
 
+//LINK - SvgContent Reducible
 #[derive(Clone, Debug, Eq, PartialEq, Properties)]
 struct SvgContent {
     svg: Option<String>
@@ -132,60 +136,77 @@ impl Reducible for SvgContent {
         }
     }
 }
+#[derive(Properties, PartialEq)]
+struct OptionProps {
+    x: Option<HashMap<String, bool>>,
+    y: Option<HashMap<String, bool>>
+}
+//LINK - Options
+mod option;
+#[function_component(Options)]
+fn options() -> Html {
+    let entity_ctx = use_context::<EntityContext>().expect("no svg ctx");
+    
+    html! {
+    <>
+        <option::Y />
+        <option::X />
+    </>
+    }
+}
+mod theme;
 //LINK - Code
 #[function_component(Code)]
 fn code(code: &CodeProp) -> Html {
     let user_ctx = use_context::<UserStateContext>().expect("no User ctx found");
-    let svg_ctx = use_reducer(|| SvgContent {svg: None});
+    let entity_ctx = use_reducer(|| Entity::new() );
+    let focus = use_state(|| theme::Focus {
+        stroke: "#000000 !important".to_owned(),
+    });
+    let unfocus = use_state(|| theme::Unfocus {
+        stroke: "none !important".to_owned(),
+        fill: "none !important".to_owned()
+    });
     let fallback = html! {<div>{"Loading..."}</div>};
-    let svg = {
-        let user_ctx = user_ctx.clone();
-        //let e = spawn_local(async move {
-        //    let url_str = format!("http://127.0.0.2:8081/{:?}", code.code.clone());
-        //    Ok(html! {
-        //        <div> {code.code.clone()} </div>
-        //    })
-        //});
-    };
     html! {
-    <>
-        <ContextProvider<SvgContentContext> context={svg_ctx}>
-        //{svg_content}
-        <SvgData code={code.code.clone()}/>
-        <div> {svg} </div>
-        </ContextProvider<SvgContentContext>>
+    <>    
+        <ContextProvider<theme::Focus> context={(*focus).clone()}>
+        <ContextProvider<theme::Unfocus> context={(*unfocus).clone()}>
+        <ContextProvider<EntityContext> context={entity_ctx}>
+            <Options/> 
+            <SvgData code={code.code.clone()}/>
+        </ContextProvider<EntityContext>>
+        </ContextProvider<theme::Unfocus>>
+        </ContextProvider<theme::Focus>>
     </>
     }
 }
+
 #[function_component(SvgData)]
 fn svg_data(code: &CodeProp) -> Html {
     let code = code.code.clone();
-    let svg_content_ctx = use_context::<SvgContentContext>().expect("no Svg Content ctx found");
+    let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
     spawn_local(async move {
         let svg_req = reqwasm::http::Request::get(
             &format!("http://127.0.0.2:8081/{:?}", code)
         )
         .send()
         .await;
-        //let svg_option_req = reqwasm::http::Request::get(
-        //    &format!("http://127.0.0.2:8081/{:?}/option", code)
-        //)
-        //.send()
-        //.await;
-        //clog!(format!("svg_option_req: {:?}", svg_option_req));
-
+        
         clog!(format!("svg_req: {:?}", svg_req));
-
+        
         match svg_req {
             Ok(response) => {
                 clog!("Ok(response)");
                 if response.status_text() == "OK" {
                     clog!("Success to submit form");
                     let body_text = response.text().await.expect("Failed to get body text");
-
-                    svg_content_ctx.dispatch(Some(body_text));
+                    let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
                     
-
+                    if let Ok(mut entity) = entity {
+                        let _ = entity.produce_option();
+                        entity_ctx.dispatch(Some(entity));
+                    }
                 }
             },
             Err(_) => {
@@ -194,8 +215,8 @@ fn svg_data(code: &CodeProp) -> Html {
         }
     });
 
-    let svg_content_ctx2 = use_context::<SvgContentContext>().expect("no Svg Content ctx found");
-    match &svg_content_ctx2.svg {
+    let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
+    match &entity_ctx.svg_content {
         Some(svg) => {
             let div: Element = document().create_element("div").unwrap();
             div.set_inner_html(svg);
@@ -265,41 +286,6 @@ fn editor_login() -> Html {
             password.set(input.value());
         })
     };
-    //let oncheckuser = {
-    //    let has_user_state = has_user_state.clone();
-    //    Callback::from(move |e: MouseEvent| {
-    //        clog!(format!("has_useer {:?}", has_user_state));
-    //        e.prevent_default();
-    //    })
-    //};
-    //let dashboard_request = {
-    //    let session_token = session_token.clone();
-    //    Callback::from(move |e: MouseEvent| {
-    //        e.prevent_default();
-    //        let session_token = session_token.clone();
-    //        spawn_local(async move {
-    //            clog!(format!("session_token.value {:?}", session_token.value));
-    //            let client = Client::new();
-    //            let res = client.get("http://127.0.0.3:8081/editor/dashboard")
-    //                .header("Origin", "http://127.0.0.2:8081")
-    //                .send()
-    //                .await;
-//
-    //            match res {
-    //                Ok(response) => {
-    //                    if response.status().is_success() {
-    //                        clog!("dashboard-request: success ok()");
-    //                    } else {
-    //                        clog!("dashboard-request: not found");
-    //                    }
-    //                }
-    //                Err(err) => {
-    //                    clog!("dashboard-request: failed request");
-    //                }
-    //            }
-    //        });
-    //    })
-    //};
 
     html! {
         <>
@@ -356,7 +342,6 @@ fn app_load_state(local_storage_user: Option<String>, local_storage: Storage, ha
                                 user_state_contextb.dispatch(data);
                             } else {
                                 clog!("NOT OK");
-
                                 let _remove_loaded = local_storage.remove_item("user");
                                 user_state_contextb.dispatch(None);
                             }
@@ -507,6 +492,7 @@ struct AppState {
 
 type UserStateContext = UseReducerHandle<UserState>;
 type SvgContentContext = UseReducerHandle<SvgContent>;
+type EntityContext = UseReducerHandle<Entity>;
 
 //fn id_to_class(svg_element: &str) -> &str {
 //    let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
