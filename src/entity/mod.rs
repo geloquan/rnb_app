@@ -71,7 +71,7 @@ impl Entity {
     
     pub fn produce_option(&mut self) -> Result<Self, &'static str> {
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
-        let _floor_value = Regex::new(r#"floor\S*"#).unwrap();
+        let floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
         let _shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
         let _class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
@@ -108,6 +108,14 @@ impl Entity {
                     {
                         to_focus_ranges.push(start..end);
                     }
+
+                    for data_name in data_name_properties {
+                        data_name.substring("floor-");
+                        if let Some(y_option) = self.y_option {
+                            y_option.push(data_name);
+                        } 
+                    }
+                    
                     ranges.push(start..end);
 
                     //ranges.sort_by(|a, b| b.end.cmp(&a.end));
