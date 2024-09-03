@@ -31,11 +31,11 @@ pub struct Entity {
     pub default_floor: String,
     pub current_floor: Option<String>,
 
-    x_option: Option<HashMap<String, bool>>,
-    y_option: Option<HashMap<String, bool>>,
-
-    classes: Option<HashMap<(String, String), bool>>,
-    data_name: Option<HashMap<String, bool>>,
+    pub x_option: Option<HashMap<String, bool>>,
+    pub y_option: Option<HashMap<String, bool>>,
+    
+    pub classes: Option<HashMap<(String, String), bool>>,
+    pub data_name: Option<HashMap<String, bool>>,
 }
 impl Reducible for Entity {
     type Action = Option<Entity>;
@@ -69,19 +69,21 @@ impl Entity {
         self.default_floor != ""
     }
     
-    pub fn produce_option(&mut self) -> Result<(), &'static str> {
-        let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
-        let floor_value = Regex::new(r#"floor\S*"#).unwrap();
+    pub fn produce_option(&mut self) -> Result<Self, &'static str> {
+        let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
+        let _floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
-        let shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
-        let class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
+        let _shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
+        let _class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
 
         let focus_style = r#"style="stroke: #000000 !important""#;
-        let unfocus_style = r#"style="stroke: none !important"; fill: none !important"#;
+        let unfocus_style = r#"style="stroke: none !important; fill: none !important""#;
 
-        let mut x: HashMap<String, bool> = HashMap::new();
+        let mut _x: HashMap<String, bool> = HashMap::new();
 
         let mut ranges: Vec<Range<i32>> = Vec::new();
+            
+        let mut to_focus_ranges: Vec<Range<i32>> = Vec::new();
         
         let mut svg_raw_content = self.svg_raw_content.clone();
 
@@ -104,8 +106,9 @@ impl Entity {
                     if data_name_properties.contains(&self.default_floor.as_str()) ||
                     data_name_properties.contains(&self.current_floor.clone().unwrap_or("".to_owned()).as_str()) 
                     {
-                        ranges.push(start..end);
+                        to_focus_ranges.push(start..end);
                     }
+                    ranges.push(start..end);
 
                     //ranges.sort_by(|a, b| b.end.cmp(&a.end));
 
@@ -169,19 +172,40 @@ impl Entity {
         }
         
         let mut unique_ranges = HashSet::new();
-        let unique_ranges_vec: Vec<Range<i32>> = ranges
+        let mut unique_ranges_vec: Vec<Range<i32>> = ranges
             .clone()
             .into_iter()
             .filter(|range| unique_ranges.insert((range.start, range.end)))
             .collect();
+        let mut to_focus_unique_ranges = HashSet::new();
+        let mut to_focus_unique_ranges_vec: Vec<Range<i32>> = to_focus_ranges
+            .clone()
+            .into_iter()
+            .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
+            .collect();
+
+        clog!(format!("self.current_floor: {:?}", self.current_floor));
+        clog!(format!("self.default_floor: {:?}", self.default_floor));
+        clog!(format!("ranges: {:?}", unique_ranges_vec));
+        clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
+        if let Some(ref mut svg_raw_content) = svg_raw_content {
+            while let Some(last_element) = unique_ranges_vec.last() {
+                if to_focus_unique_ranges_vec.contains(last_element) {
+                    clog!(format!("Last element: {}", last_element.end));
+                    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
+                } else {
+                    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
+                }
+    
+                unique_ranges_vec.pop();
+            } 
+        }
+
         clog!(format!("ranges: {:?}", unique_ranges_vec));
 
-        clog!(format!("x: {:?}", x));
-
         self.svg_content = svg_raw_content.clone();
-        self.x_option = Some(x);
         
-        Ok(())
+        Ok(self.to_owned())
     }
     pub fn build_svg(&self, entity_case: EntityCase) -> Result<(), &'static str> {
         if self.has_all_values() { return Err("one of the property may be empty"); }

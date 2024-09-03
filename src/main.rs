@@ -2,8 +2,8 @@ use std::{borrow::Borrow, cell::RefCell, collections::HashMap, ops::Deref, rc::R
 
 use gloo_utils::document;
 use http::{header, HeaderMap, StatusCode};
-use wasm_bindgen::JsValue;
-use web_sys::{js_sys::{Error, JSON}, window, Element, HtmlInputElement, Node, Storage};
+use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
+use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlInputElement, Node, Storage};
 use yew::{
     function_component, html, prelude::*, suspense::use_future, Html, Properties
 };
@@ -204,8 +204,7 @@ fn svg_data(code: &CodeProp) -> Html {
                     let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
                     
                     if let Ok(mut entity) = entity {
-                        let _ = entity.produce_option();
-                        entity_ctx.dispatch(Some(entity));
+                        entity_ctx.dispatch(Some(entity.produce_option().unwrap()));
                     }
                 }
             },
@@ -220,6 +219,23 @@ fn svg_data(code: &CodeProp) -> Html {
         Some(svg) => {
             let div: Element = document().create_element("div").unwrap();
             div.set_inner_html(svg);
+            let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
+            let closure = Closure::wrap(Box::new(move |event: Event| {
+                web_sys::console::log_1(&"Event triggered".into());
+                
+            }) as Box<dyn FnMut(_)>);
+
+            let clicked = {
+                Callback::from(move |event: Event| {
+                })
+            };
+            
+            target
+            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+            .unwrap();
+
+            closure.forget();
+
             let node: Node = div.into();
             html! {
                 Html::VRef(node)
@@ -491,51 +507,7 @@ struct AppState {
 }
 
 type UserStateContext = UseReducerHandle<UserState>;
-type SvgContentContext = UseReducerHandle<SvgContent>;
 type EntityContext = UseReducerHandle<Entity>;
-
-//fn id_to_class(svg_element: &str) -> &str {
-//    let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
-//    let floor_value = Regex::new(r#"floor\S*"#).unwrap();
-//    let id_value = Regex::new(r#"data-name="([^"]+)""#).unwrap();
-//    let shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
-//    let class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
-//
-//    let mut modified_content = svg_element.to_string();
-//
-//    for some_g in g_tag.captures_iter(svg_element) {
-//        if let Some(g) = some_g.get(0) {
-//            for some_id_value in id_value.captures(g.as_str()) {
-//                let raw_id_value = some_id_value.get(1).unwrap().as_str();
-//                let id_vec_value = raw_id_value.split(' ').collect::<Vec<&str>>();
-//                let floor = floor_value.captures(some_id_value.get(1).unwrap().as_str()).unwrap().get(0).unwrap().as_str();
-//                self.join_classes(
-//                    id_vec_value
-//                        .clone()
-//                        .into_iter()
-//                        .map(|id| (floor.to_string(), id.to_string()))
-//                        .collect::<Vec<(String, String)>>(),
-//                );
-//                for some_shape_tag in shape_tag.captures_iter(g.as_str()) {
-//                    if let Some(shape_tag_value) = some_shape_tag.get(0) {
-//                        for some_class_value in class_value.captures_iter(shape_tag_value.as_str()) {
-//                            //println!("some_class_value {:?}", some_class_value);
-//                            let class_full_match = some_class_value.get(0).expect("Full match capture is missing").as_str();
-//                            let new_class_content = class_full_match.replace(&format!(r#"class="{}""#, some_class_value.get(1).unwrap().as_str()), &format!(r#"class="{} {}""#, some_class_value.get(1).unwrap().as_str(), raw_id_value));
-//                            
-//                            let new_shape_tag = shape_tag_value.as_str().replace(&format!(r#"class="{}""#, some_class_value.get(1).unwrap().as_str()), &new_class_content);
-//                            let full_g_match = some_g.get(0).expect("Full match capture is missing").as_str();
-//                            let new_g_2 = full_g_match.replace(shape_tag_value.as_str(), &new_shape_tag);
-//                            modified_content = modified_content.replace(full_g_match, &new_g_2);
-//                        }
-//                    } 
-//                }
-//            }
-//        }
-//    }
-//    
-//    "hello"
-//}
 
 #[function_component(App)]
 pub fn app() -> Html {
@@ -612,101 +584,3 @@ pub fn app() -> Html {
 fn main() {
     yew::Renderer::<App>::new().render();
 }
-//
-//fn join_classes(&mut self, id_vec: Vec<(String, String)>) {fn join_classes(&mut self, id_vec: Vec<(String, String)>) {
-//    if let Some(ref mut classes) = self.classes {    if let Some(ref mut classes) = self.classes {
-//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
-//            classes.insert(id, true);            classes.insert(id, true);
-//        }        }
-//    } else {    } else {
-//        let mut new_classes = HashMap::new();        let mut new_classes = HashMap::new();
-//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
-//            new_classes.insert(id, true);            new_classes.insert(id, true);
-//        }        }
-//        self.classes = Some(new_classes);        self.classes = Some(new_classes);
-//    }    }
-//}}
-//fn join_data_name(&mut self, id_vec: Vec<String>) {fn join_data_name(&mut self, id_vec: Vec<String>) {
-//    if let Some(ref mut data_name) = self.data_name {    if let Some(ref mut data_name) = self.data_name {
-//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
-//            data_name.insert(id, true);            data_name.insert(id, true);
-//        }        }
-//    } else {    } else {
-//        let mut new_data_name = HashMap::new();        let mut new_data_name = HashMap::new();
-//        for id in id_vec.into_iter() {        for id in id_vec.into_iter() {
-//            new_data_name.insert(id, true);            new_data_name.insert(id, true);
-//        }        }
-//        self.data_name = Some(new_data_name);        self.data_name = Some(new_data_name);
-//    }    }
-//}}
-//#[derive(Clone, Debug)]#[derive(Clone, Debug)]
-//pub struct Entity {pub struct Entity {
-//    name: String,    name: String,
-//    pub svg_content: Option<String>,    pub svg_content: Option<String>,
-//    pub filter_options: Option<Node>,    pub filter_options: Option<Node>,
-//    pub classes: Option<HashMap<(String, String), bool>>,    pub classes: Option<HashMap<(String, String), bool>>,
-//    pub data_name: Option<HashMap<String, bool>>,    pub data_name: Option<HashMap<String, bool>>,
-//    pub filter_actions: Option<String>,    pub filter_actions: Option<String>,
-//    pub edit_mode: bool,    pub edit_mode: bool,
-//    pub default_floor: String    pub default_floor: String
-//}}
-//impl Entity {impl Entity {
-//    pub fn new() -> Self {    pub fn new() -> Self {
-//        println!("Entity new()");        println!("Entity new()");
-//        Entity {        Entity {
-//            name: "".to_string(),            name: "".to_string(),
-//            svg_content: None,            svg_content: None,
-//            filter_options: None,            filter_options: None,
-//            classes: None,            classes: None,
-//            data_name: None,            data_name: None,
-//            filter_actions: None,            filter_actions: None,
-//            edit_mode: false,            edit_mode: false,
-//            default_floor: "".to_string(),            default_floor: "".to_string(),
-//        }        }
-//    }    }
-//    fn option_element(&mut self) {    fn option_element(&mut self) {
-//        let div: Element = document().create_element("div").unwrap();        let div: Element = document().create_element("div").unwrap();
-//        let select_x: Element = document().create_element("select").unwrap();        let select_x: Element = document().create_element("select").unwrap();
-//        let select_y: Element = document().create_element("select").unwrap();        let select_y: Element = document().create_element("select").unwrap();
-//
-//        let mut x_cache: Vec<&str> = Vec::new();        let mut x_cache: Vec<&str> = Vec::new();
-//        let mut y_cache: Vec<&str> = Vec::new();        let mut y_cache: Vec<&str> = Vec::new();
-//                
-//        match &self.classes {        match &self.classes {
-//            Some(classes) => {            Some(classes) => {
-//                let mut y_items: Vec<String> = Vec::new();                let mut y_items: Vec<String> = Vec::new();
-//                for (class, _) in classes {                for (class, _) in classes {
-//                    let class_name = &class.0;                    let class_name = &class.0;
-//                                        
-//                    if class_name.contains("floor") && !y_cache.contains(&class_name.as_str()) {                    if class_name.contains("floor") && !y_cache.contains(&class_name.as_str()) {
-//                        y_items.push(class_name.clone());                        y_items.push(class_name.clone());
-//                        y_cache.push(class_name.as_str());                        y_cache.push(class_name.as_str());
-//                    }                    }
-//
-//                    if class.0 == self.default_floor && !x_cache.contains(&class.1.as_str()) {                    if class.0 == self.default_floor && !x_cache.contains(&class.1.as_str()) {
-//                        let option: Element = document().create_element("option").unwrap();                        let option: Element = document().create_element("option").unwrap();
-//                        option.set_node_value(Some(class.1.as_str()));                        option.set_node_value(Some(class.1.as_str()));
-//                        option.set_text_content(Some(class.1.as_str()));                        option.set_text_content(Some(class.1.as_str()));
-//                        let option_node: Node = option.into();                        let option_node: Node = option.into();
-//                        let _ = select_x.append_child(&option_node);                        let _ = select_x.append_child(&option_node);
-//                        x_cache.push(&class.1.as_str());                        x_cache.push(&class.1.as_str());
-//                    }                    }
-//                }                }
-//                                
-//                y_items.sort();                y_items.sort();
-//                for item in y_items {                for item in y_items {
-//                    let option: Element = document().create_element("option").unwrap();                    let option: Element = document().create_element("option").unwrap();
-//                    option.set_node_value(Some(item.as_str()));                    option.set_node_value(Some(item.as_str()));
-//                    option.set_text_content(Some(item.as_str()));                    option.set_text_content(Some(item.as_str()));
-//                    let option_node: Node = option.into();                    let option_node: Node = option.into();
-//                    let _ = select_y.append_child(&option_node);                    let _ = select_y.append_child(&option_node);
-//                }                }
-//            },            },
-//            None => {            None => {
-//            }            }
-//        }        }
-//                
-//        let node: Node = div.into();        let node: Node = div.into();
-//        self.filter_options = Some(node);        self.filter_options = Some(node);
-//    }    }
-//}}
