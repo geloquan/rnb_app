@@ -109,11 +109,11 @@ impl Entity {
                         to_focus_ranges.push(start..end);
                     }
 
-                    for data_name in data_name_properties {
-                        data_name.substring("floor-");
-                        if let Some(y_option) = self.y_option {
-                            y_option.push(data_name);
-                        } 
+                    for data_namee in data_name_properties {
+                        let data_namee = data_namee.strip_prefix("floor-").unwrap_or(data_namee);
+                        if let Some(ref mut y_option) = self.y_option { 
+                            y_option.insert(data_namee.to_string(), true); 
+                        }
                     }
                     
                     ranges.push(start..end);

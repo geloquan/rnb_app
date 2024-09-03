@@ -8,19 +8,18 @@ use crate::{EntityContext, _Entity::default_floor};
 pub fn y() -> Html {
     let ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let select: Element = document().create_element("select").unwrap();
-    &ctx.y_option.sort_by(|a, b| a.end.cmp(&b.end));
-
-    let selection = {
-        
+    if let Some(ref map) = &ctx.y_option {
+        let mut sorted_vec: Vec<(&String, &bool)> = map.iter().collect();
+        sorted_vec.sort_by(|a, b| a.0.cmp(b.0));
     }
     
     match (&ctx.y_option, &ctx.default_floor) {
         (Some(y), floor) if !floor.is_empty() => {
             for option_y in y {
                 let option: Element = document().create_element("option").unwrap();
-                option.set_value(&y);
-                option.set_inner_text(&y);
-                select.set_inner_html(option);
+                option.set_node_value(Some(&option_y.0));
+                option.set_attribute("value", &option_y.0);
+                select.append_child(&option);
             }
             
             let node: Node = select.into();
