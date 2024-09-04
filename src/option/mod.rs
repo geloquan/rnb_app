@@ -1,5 +1,7 @@
+use gloo::console::log as clog;
 use gloo_utils::document;
-use yew::{function_component, html, use_context, Html};
+use wasm_bindgen::{prelude::Closure, JsCast};
+use yew::{function_component, html, use_context, Event, Html};
 use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlInputElement, Node, Storage};
 
 use crate::{EntityContext, _Entity::default_floor};
@@ -12,18 +14,20 @@ pub fn y() -> Html {
         let mut sorted_vec: Vec<(&String, &String)> = map.iter().collect();
         sorted_vec.sort_by(|a, b| a.0.cmp(b.0));
     }
-    
     match (&ctx.y_option, &ctx.default_floor) {
         (Some(y), floor) if !floor.is_empty() => {
             for option_y in y {
-                let option: Element = document().create_element("option").unwrap();
-                option.set_node_value(Some(&option_y.0));
-                option.set_attribute("value", &option_y.0);
-                select.append_child(&option);
+                clog!(format!("option y: {:?}", option_y));
+                clog!(format!("floor: {:?}", floor));
+                if option_y.1 == floor {
+                    let option: Element = document().create_element("option").unwrap();
+                    option.set_text_content(Some(&option_y.0));
+                    option.set_attribute("value", &option_y.0);
+                    select.append_child(&option);
+                } 
             }
             
             let node: Node = select.into();
-            
             html! {
                 Html::VRef(node)
             }
@@ -50,7 +54,55 @@ pub fn y() -> Html {
 }
 #[function_component(X)]
 pub fn x() -> Html {
-    let _ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    html! {
+    let ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
+    let select: Element = document().create_element("select").unwrap();
+    if let Some(ref map) = &ctx.x_option {
+        let mut sorted_vec: Vec<(&String, &String)> = map.iter().collect();
+        sorted_vec.sort_by(|a, b| a.0.cmp(b.0));
+    }
+    match (&ctx.x_option, &ctx.default_floor) {
+        (Some(x), floor) if !floor.is_empty() => {
+            for option_x in x {
+                if option_x.1 == floor {
+                    let option: Element = document().create_element("option").unwrap();
+                    option.set_text_content(Some(&option_x.0));
+                    option.set_attribute("value", &option_x.0);
+
+                    select.append_child(&option);
+                }
+            }
+            let target: EventTarget = select.clone().dyn_into::<EventTarget>().unwrap();
+            let closure = Closure::wrap(Box::new(move |event: Event| {
+                let target = event.target().unwrap();
+                clog!(format!("selected is: {:?}", target.dyn_into::<web_sys::HtmlSelectElement>().unwrap().value()));
+            }) as Box<dyn FnMut(_)>);
+            target
+            .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())
+            .unwrap();
+            closure.forget();
+            
+            let node: Node = select.into();
+            html! {
+                Html::VRef(node)
+            }
+        },
+        (Some(x), _) => {
+            let node: Node = select.into();
+            html! {
+                Html::VRef(node)
+            }
+        },
+        (None, floor) if floor.is_empty() => {
+            let node: Node = select.into();
+            html! {
+                Html::VRef(node)
+            }
+        }
+        (_, _) => {
+            let node: Node = select.into();
+            html! {
+                Html::VRef(node)
+            }
+        }
     }
 }

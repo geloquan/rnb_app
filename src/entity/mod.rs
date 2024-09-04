@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, ops::Range, rc::Rc};
 
-use _Entity::data_name;
+use _Entity::{data_name, default_floor};
 use gloo::console::log as clog;
 use gloo_utils::document;
 use regex::Regex;
@@ -90,7 +90,6 @@ impl Entity {
         if let Some(svg_raw_content) = &svg_raw_content {
             for some_data_name_property in data_name_property.captures_iter(&svg_raw_content) {
                 if let Some(data_name_property) = some_data_name_property.get(0) {
-                    clog!(format!("Some(data_name_property): {:?}", Some(data_name_property)));
                     let raw_range = some_data_name_property.get(0).unwrap();
                     let start = raw_range.start() as i32;
                     let end = raw_range.end() as i32;
@@ -101,7 +100,6 @@ impl Entity {
                     .as_str()
                     .split(' ')
                     .collect::<Vec<&str>>();
-                    clog!(format!("id_vec_value: {:?}", data_name_properties));
 
                     if data_name_properties.contains(&self.default_floor.as_str()) ||
                     data_name_properties.contains(&floor.unwrap_or("")) 
@@ -111,39 +109,64 @@ impl Entity {
 
                     ranges.push(start..end);
 
-                    for data_name_value in &data_name_properties {
-                        if data_name_value.contains("floor-") {
-                            match &mut self.x_option {
-                                Some(vec) => {
-                                    for data_name_value_2 in &data_name_properties {
-                                        vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                    let equal_floor: bool = data_name_properties.iter().any(|data_name_value| {
+                        data_name_value == &floor.unwrap_or("") ||
+                        data_name_value == &self.default_floor
+                    });
+
+                    clog!(format!("data_name_properties {:?}", data_name_properties));
+
+                    if equal_floor {
+                        clog!("equal_floor");
+                        for data_name_value in data_name_properties.iter() {
+                            if data_name_value.contains("floor-") {
+                                continue;
+                            } else {
+                                match (&mut self.x_option, self.default_floor.clone(), floor) {
+                                    (Some(vec), _, Some(floor)) => {
+                                        clog!("Some(vec)");
+                                        for data_name_value_2 in data_name_properties.iter() {
+                                            clog!(format!("data_name_value_2 {:?}", data_name_value_2));
+                                        }
+                                        vec.insert(data_name_value.to_string(), floor.to_string());
+                                    },
+                                    (Some(vec), default_floor_, None) => {
+                                        vec.insert(data_name_value.to_string(), default_floor_.to_string());
+                                    },
+                                    (None, default_floor_, _) => {
+                                        let mut temp = HashMap::new(); 
+                                        temp.insert(data_name_value.to_string(), default_floor_.to_string());
+                                        self.x_option = Some(temp);
                                     }
-                                }
-                                None => {
-                                    let mut  temp = HashMap::new(); 
-                                    for data_name_value_2 in &data_name_properties {
-                                        temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
-                                    }
-                                    self.x_option = Some(temp);
-                                }
-                            }
-                        } else {
-                            match &mut self.y_option {
-                                Some(vec) => {
-                                    for data_name_value_2 in &data_name_properties {
-                                        vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
-                                    }
-                                }
-                                None => {
-                                    let mut  temp = HashMap::new(); 
-                                    for data_name_value_2 in &data_name_properties {
-                                        temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
-                                    }
-                                    self.y_option = Some(temp);
+    
                                 }
                             }
                         }
+                    } else {
+                        clog!("else");
                     }
+                    //for data_name_value in data_name_properties.iter() {
+                    //    if data_name_value.contains("floor-") {
+                    //        continue;
+                    //    } else {
+                    //        clog!(format!("data_name_value {:?}", data_name_value));
+                    //        
+                    //    }
+                    //    //match &mut self.y_option {
+                    //    //    Some(vec) => {
+                    //    //        for data_name_value_2 in data_name_properties.clone() {
+                    //    //            vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                    //    //        }
+                    //    //    }
+                    //    //    None => {
+                    //    //        let mut  temp = HashMap::new(); 
+                    //    //        for data_name_value_2 in data_name_properties.clone() {
+                    //    //            temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                    //    //        }
+                    //    //        self.y_option = Some(temp);
+                    //    //    }
+                    //    //}
+                    //}
                 }
             }
         }
@@ -162,14 +185,9 @@ impl Entity {
                 .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
                 .collect();
     
-            clog!(format!("self.current_floor: {:?}", self.current_floor));
-            clog!(format!("self.default_floor: {:?}", self.default_floor));
-            clog!(format!("ranges: {:?}", unique_ranges_vec));
-            clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
             if let Some(ref mut svg_raw_content) = svg_raw_content {
                 while let Some(last_element) = unique_ranges_vec.last() {
                     if to_focus_unique_ranges_vec.contains(last_element) {
-                        clog!(format!("Last element: {}", last_element.end));
                         svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
                     } else {
                         svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);

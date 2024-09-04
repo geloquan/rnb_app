@@ -193,13 +193,10 @@ fn svg_data(code: &CodeProp) -> Html {
         .send()
         .await;
         
-        clog!(format!("svg_req: {:?}", svg_req));
         
         match svg_req {
             Ok(response) => {
-                clog!("Ok(response)");
                 if response.status_text() == "OK" {
-                    clog!("Success to submit form");
                     let body_text = response.text().await.expect("Failed to get body text");
                     let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
                     
@@ -209,7 +206,6 @@ fn svg_data(code: &CodeProp) -> Html {
                 }
             },
             Err(_) => {
-                clog!("Err(_)");
             }
         }
     });
@@ -277,11 +273,9 @@ fn editor_login() -> Html {
                 "username": username.to_string(),
                 "password": password.to_string()
             });
-            clog!(format!("params_json {:?}", &params_json));
             
             spawn_local(async move {
                 let usere = login(&params_json).await;
-                clog!(format!("user {:?}", &usere));
                 has_user_ctx.dispatch(usere);
             });
         })
@@ -334,13 +328,11 @@ fn editor_login() -> Html {
 }
 
 fn app_load_state(local_storage_user: Option<String>, local_storage: Storage, has_user_ctx: UseReducerHandle<UserState>) -> Result<(), Error> {
-    clog!("None(loaded)");
     if let Some(user_data) = local_storage_user {
         let match_user_data: Result<Option<User>, serde_json::Error> = serde_json::from_str(&user_data);
         let user_state_contexta = has_user_ctx.clone();
         match match_user_data {
             Ok(data) => {
-                clog!("Ok(data)");
                 let local_storage = local_storage.clone();
                 spawn_local(async move {
                     let user_state_contextb = user_state_contexta.clone();
@@ -353,24 +345,19 @@ fn app_load_state(local_storage_user: Option<String>, local_storage: Storage, ha
                     match req {
                         Ok(response) => {
                             if response.status_text() == "OK" {
-                                clog!("OK");
-                                
                                 user_state_contextb.dispatch(data);
                             } else {
-                                clog!("NOT OK");
                                 let _remove_loaded = local_storage.remove_item("user");
                                 user_state_contextb.dispatch(None);
                             }
                         },
                         Err(_) => {
-                            clog!("Err(response)");
                             user_state_contextb.dispatch(None);
                         }
                     };
                 });
             },
             Err(_) => {
-                clog!("Err(data)");
                 user_state_contexta.dispatch(None);
             },
         };
@@ -513,7 +500,6 @@ type EntityContext = UseReducerHandle<Entity>;
 
 #[function_component(App)]
 pub fn app() -> Html {
-    clog!("start up");
     let local_storage = web_sys::window()
     .and_then(|win| win.local_storage().ok())
     .and_then(|storage| storage)
@@ -528,13 +514,11 @@ pub fn app() -> Html {
     let user_state = use_reducer(|| UserState {has_user: None});
     
     let onload = {
-        clog!("onload()");
         let local_storage = local_storage.clone();
         let local_storage_loaded = local_storage_loaded.clone();
         let has_user_ctx = user_state.clone();
         match local_storage_loaded {
             Some(loaded) => {
-                clog!("Some(loaded)");
                 let match_loaded_data: Result<AppState, serde_json::Error> = serde_json::from_str(&loaded);
                 match match_loaded_data {
                     Ok(app_state) => {
@@ -553,7 +537,6 @@ pub fn app() -> Html {
                 }
             },
             None => {
-                clog!("None(loaded)");
                 let _ = app_load_state(local_storage_user, local_storage, has_user_ctx);
             }
         }
