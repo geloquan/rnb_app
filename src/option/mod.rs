@@ -9,7 +9,7 @@ pub fn y() -> Html {
     let ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let select: Element = document().create_element("select").unwrap();
     if let Some(ref map) = &ctx.y_option {
-        let mut sorted_vec: Vec<(&String, &bool)> = map.iter().collect();
+        let mut sorted_vec: Vec<(&String, &String)> = map.iter().collect();
         sorted_vec.sort_by(|a, b| a.0.cmp(b.0));
     }
     

@@ -31,8 +31,8 @@ pub struct Entity {
     pub default_floor: String,
     pub current_floor: Option<String>,
 
-    pub x_option: Option<HashMap<String, bool>>,
-    pub y_option: Option<HashMap<String, bool>>,
+    pub x_option: Option<HashMap<String, String>>,
+    pub y_option: Option<HashMap<String, String>>,
     
     pub classes: Option<HashMap<(String, String), bool>>,
     pub data_name: Option<HashMap<String, bool>>,
@@ -69,7 +69,7 @@ impl Entity {
         self.default_floor != ""
     }
     
-    pub fn produce_option(&mut self) -> Result<Self, &'static str> {
+    pub fn produce_option(&mut self, floor: Option<&str>) -> Result<Self, &'static str> {
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
@@ -104,117 +104,87 @@ impl Entity {
                     clog!(format!("id_vec_value: {:?}", data_name_properties));
 
                     if data_name_properties.contains(&self.default_floor.as_str()) ||
-                    data_name_properties.contains(&self.current_floor.clone().unwrap_or("".to_owned()).as_str()) 
+                    data_name_properties.contains(&floor.unwrap_or("")) 
                     {
                         to_focus_ranges.push(start..end);
                     }
 
-                    for data_namee in data_name_properties {
-                        let data_namee = data_namee.strip_prefix("floor-").unwrap_or(data_namee);
-                        if let Some(ref mut y_option) = self.y_option { 
-                            y_option.insert(data_namee.to_string(), true); 
-                        }
-                    }
-                    
                     ranges.push(start..end);
 
-                    //ranges.sort_by(|a, b| b.end.cmp(&a.end));
-
-                    //for some_id_value in id_value.captures(g.as_str()) {
-                    //    let raw_range = some_id_value.get(0).unwrap();
-                    //    let start = raw_range.start() as i32;
-                    //    let end = raw_range.end() as i32;
-                    //    ranges.push(start..end);
-                    //    ranges.sort_by(|a, b| b.end.cmp(&a.end));
-                    //    let mut unique_ranges = HashSet::new();
-                    //    let unique_ranges_vec: Vec<Range<i32>> = ranges
-                    //        .clone()
-                    //        .into_iter()
-                    //        .filter(|range| unique_ranges.insert((range.start, range.end)))
-                    //        .collect();
-                    //    let raw_id_value = some_id_value.get(1).unwrap().as_str();
-                    //    let id_vec_value = raw_id_value.split(' ').collect::<Vec<&str>>();
-                    //    let floor = floor_value.captures(some_id_value.get(1).unwrap().as_str()).unwrap().get(0).unwrap().as_str();
-                    //    
-                    //    clog!(format!("some_id_value: {:?}", some_id_value));
-                    //    clog!(format!("ranges: {:?}", unique_ranges_vec));
-                    //    
-                    //    clog!(format!("raw_id_value: {:?}", raw_id_value));
-                    //    clog!(format!("id_vec_value: {:?}", id_vec_value));
-                    //    clog!(format!("floor: {:?}", floor));
-                    //    clog!(format!("g: {:?}", g));
-                    //    if let Some(current_floor) = &self.current_floor {
-                    //        if current_floor == floor {
-                    //            for id in id_vec_value {
-                    //                x.insert(id.to_string(), true); 
-                    //            }
-                    //        }
-                    //    } else if self.default_floor == floor {
-                    //        for id in id_vec_value {
-                    //            x.insert(id.to_string(), true); 
-                    //        }
-                    //        let option: Element = document().create_element("option").unwrap();
-                    //        //for some_shape_tag in shape_tag.captures_iter(g.as_str()) {
-                    //        //    if let Some(shape_tag_value) = some_shape_tag.get(0) {
-                    //        //        for some_class_value in class_value.captures_iter(shape_tag_value.as_str()) {
-                    //        //            //println!("some_class_value {:?}", some_class_value);
-                    //        //            let class_full_match = some_class_value.get(0).expect("Full match capture is missing").as_str();
-                    //        //            let new_class_content = class_full_match.replace(&format!(r#"class="{}""#, some_class_value.get(1).unwrap().as_str()), &format!(r#"class="{} {}""#, some_class_value.get(1).unwrap().as_str(), raw_id_value));
-                    //        //            
-                    //        //            let new_shape_tag = shape_tag_value.as_str().replace(&format!(r#"class="{}""#, some_class_value.get(1).unwrap().as_str()), &new_class_content);
-                    //        //            let full_g_match = some_g.get(0).expect("Full match capture is missing").as_str();
-                    //        //            let new_g_2 = full_g_match.replace(shape_tag_value.as_str(), &new_shape_tag);
-                    //        //            
-                    //        //            clog!(format!("class_full_match: {:?}", class_full_match));
-                    //        //            clog!(format!("new_class_content: {:?}", new_class_content));
-                    //        //            clog!(format!("new_shape_tag: {:?}", new_shape_tag));
-                    //        //            clog!(format!("full_g_match: {:?}", full_g_match));
-                    //        //            clog!(format!("new_g_2: {:?}", new_g_2));
-                    //        //        }
-                    //        //    } 
-                    //        //}
-                    //    }
-                    //}
+                    for data_name_value in &data_name_properties {
+                        if data_name_value.contains("floor-") {
+                            match &mut self.x_option {
+                                Some(vec) => {
+                                    for data_name_value_2 in &data_name_properties {
+                                        vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                                    }
+                                }
+                                None => {
+                                    let mut  temp = HashMap::new(); 
+                                    for data_name_value_2 in &data_name_properties {
+                                        temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                                    }
+                                    self.x_option = Some(temp);
+                                }
+                            }
+                        } else {
+                            match &mut self.y_option {
+                                Some(vec) => {
+                                    for data_name_value_2 in &data_name_properties {
+                                        vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                                    }
+                                }
+                                None => {
+                                    let mut  temp = HashMap::new(); 
+                                    for data_name_value_2 in &data_name_properties {
+                                        temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
+                                    }
+                                    self.y_option = Some(temp);
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
         
-        let mut unique_ranges = HashSet::new();
-        let mut unique_ranges_vec: Vec<Range<i32>> = ranges
-            .clone()
-            .into_iter()
-            .filter(|range| unique_ranges.insert((range.start, range.end)))
-            .collect();
-        let mut to_focus_unique_ranges = HashSet::new();
-        let mut to_focus_unique_ranges_vec: Vec<Range<i32>> = to_focus_ranges
-            .clone()
-            .into_iter()
-            .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
-            .collect();
-
-        clog!(format!("self.current_floor: {:?}", self.current_floor));
-        clog!(format!("self.default_floor: {:?}", self.default_floor));
-        clog!(format!("ranges: {:?}", unique_ranges_vec));
-        clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
-        if let Some(ref mut svg_raw_content) = svg_raw_content {
-            while let Some(last_element) = unique_ranges_vec.last() {
-                if to_focus_unique_ranges_vec.contains(last_element) {
-                    clog!(format!("Last element: {}", last_element.end));
-                    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
-                } else {
-                    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
-                }
+        {
+            let mut unique_ranges = HashSet::new();
+            let mut unique_ranges_vec: Vec<Range<i32>> = ranges
+                .clone()
+                .into_iter()
+                .filter(|range| unique_ranges.insert((range.start, range.end)))
+                .collect();
+            let mut to_focus_unique_ranges = HashSet::new();
+            let mut to_focus_unique_ranges_vec: Vec<Range<i32>> = to_focus_ranges
+                .clone()
+                .into_iter()
+                .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
+                .collect();
     
-                unique_ranges_vec.pop();
-            } 
+            clog!(format!("self.current_floor: {:?}", self.current_floor));
+            clog!(format!("self.default_floor: {:?}", self.default_floor));
+            clog!(format!("ranges: {:?}", unique_ranges_vec));
+            clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
+            if let Some(ref mut svg_raw_content) = svg_raw_content {
+                while let Some(last_element) = unique_ranges_vec.last() {
+                    if to_focus_unique_ranges_vec.contains(last_element) {
+                        clog!(format!("Last element: {}", last_element.end));
+                        svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
+                    } else {
+                        svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
+                    }
+        
+                    unique_ranges_vec.pop();
+                } 
+            }
         }
-
-        clog!(format!("ranges: {:?}", unique_ranges_vec));
 
         self.svg_content = svg_raw_content.clone();
         
         Ok(self.to_owned())
     }
+    
     pub fn build_svg(&self, entity_case: EntityCase) -> Result<(), &'static str> {
         if self.has_all_values() { return Err("one of the property may be empty"); }
         match entity_case {

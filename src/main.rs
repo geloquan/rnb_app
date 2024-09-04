@@ -204,7 +204,7 @@ fn svg_data(code: &CodeProp) -> Html {
                     let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
                     
                     if let Ok(mut entity) = entity {
-                        entity_ctx.dispatch(Some(entity.produce_option().unwrap()));
+                        entity_ctx.dispatch(Some(entity.produce_option(None).unwrap()));
                     }
                 }
             },
@@ -508,6 +508,8 @@ struct AppState {
 
 type UserStateContext = UseReducerHandle<UserState>;
 type EntityContext = UseReducerHandle<Entity>;
+//type EditorContext = UseReducerHandle<Editor>;
+
 
 #[function_component(App)]
 pub fn app() -> Html {
