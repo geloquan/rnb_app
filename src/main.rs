@@ -186,65 +186,101 @@ fn code(code: &CodeProp) -> Html {
 fn svg_data(code: &CodeProp) -> Html {
     let code = code.code.clone();
     let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    spawn_local(async move {
-        let svg_req = reqwasm::http::Request::get(
-            &format!("http://127.0.0.2:8081/{:?}", code)
-        )
-        .send()
-        .await;
-        
-        
-        match svg_req {
-            Ok(response) => {
-                if response.status_text() == "OK" {
-                    let body_text = response.text().await.expect("Failed to get body text");
-                    let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
-                    
-                    if let Ok(mut entity) = entity {
-                        entity_ctx.dispatch(Some(entity.produce_option(None).unwrap()));
+    if entity_ctx.name == "" {
+        spawn_local(async move {
+            let svg_req = reqwasm::http::Request::get(
+                &format!("http://127.0.0.2:8081/{:?}", code)
+            )
+            .send()
+            .await;
+            
+            
+            match svg_req {
+                Ok(response) => {
+                    if response.status_text() == "OK" {
+                        let body_text = response.text().await.expect("Failed to get body text");
+                        let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
+                        
+                        if let Ok(mut entity) = entity {
+                            entity_ctx.dispatch(EntityCase::Init(Some(entity)));
+                            entity_ctx.dispatch(EntityCase::ProduceOption);
+                            entity_ctx.dispatch(EntityCase::Highlight("".to_string()));
+                        }
                     }
+                },
+                Err(_) => {
                 }
-            },
-            Err(_) => {
             }
-        }
-    });
+        });
+    } 
 
     let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    match &entity_ctx.svg_content {
-        Some(svg) => {
+    let borrowed = entity_ctx.svg_content.borrow();
+    if let Some(ref svg) = *borrowed {
             let div: Element = document().create_element("div").unwrap();
             div.set_inner_html(svg);
-            let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
-            let closure = Closure::wrap(Box::new(move |event: Event| {
-                web_sys::console::log_1(&"Event triggered".into());
-                
-            }) as Box<dyn FnMut(_)>);
-
-            let clicked = {
-                Callback::from(move |event: Event| {
-                })
-            };
-            
-            target
-            .add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
-            .unwrap();
-
-            closure.forget();
+            //let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
+            //let closure = Closure::wrap(Box::new(move |event: Event| {
+            //    web_sys::console::log_1(&"Event triggered".into());
+            //    
+            //}) as Box<dyn FnMut(_)>);
+//
+            //let clicked = {
+            //    Callback::from(move |event: Event| {
+            //    })
+            //};
+            //
+            //target
+            //.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+            //.unwrap();
+//
+            //closure.forget();
 
             let node: Node = div.into();
-            html! {
+            return html! {
                 Html::VRef(node)
             }
-        },
-        None => {
-            html! {
-                <div>
-                    {"upload svg"}
-                </div>
-            }
+    } else {
+        return html! {
+            <div>
+                {"upload svg"}
+            </div>
         }
     }
+    //match entity_ctx {
+    //    Some(ref svg) => {
+    //        let div: Element = document().create_element("div").unwrap();
+    //        div.set_inner_html(svg);
+    //        //let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
+    //        //let closure = Closure::wrap(Box::new(move |event: Event| {
+    //        //    web_sys::console::log_1(&"Event triggered".into());
+    //        //    
+    //        //}) as Box<dyn FnMut(_)>);
+////
+    //        //let clicked = {
+    //        //    Callback::from(move |event: Event| {
+    //        //    })
+    //        //};
+    //        //
+    //        //target
+    //        //.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
+    //        //.unwrap();
+////
+    //        //closure.forget();
+//
+    //        let node: Node = div.into();
+    //        html! {
+    //            Html::VRef(node)
+    //        }
+    //    },
+    //    None => {
+    //        html! {
+    //            <div>
+    //                {"upload svg"}
+    //            </div>
+    //        }
+    //    }
+    //}
 }
 //LINK - EditorLogin
 #[function_component(EditorLogin)]
