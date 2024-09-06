@@ -61,6 +61,7 @@ impl Reducible for Entity {
                 }
             },
             EntityCase::Highlight(highlight) => {
+                clog!(format!("highlight: {:?}", highlight));
                 let new_string = self.clone().highlight_option(Some(&highlight));
                 match new_string {
                     Ok(string) => {
@@ -161,7 +162,7 @@ impl Entity {
                     data_name_properties.contains(&floor.unwrap_or("")) 
                     {
                         to_focus_ranges.push(start..end);
-                    }
+                    } 
 
                     ranges.push(start..end);
 
@@ -246,15 +247,51 @@ impl Entity {
                 } 
             }
         }
-        clog!(format!("before self.svg_content {:?}", self.svg_content));
         //self.svg_content.borrow_mut().replace(svg_raw_content.clone().unwrap_or("".to_string()));
-        clog!(format!("after self.svg_content {:?}", self.svg_content));
         Ok(svg_raw_content.clone().unwrap_or("".to_string()))
     }
 
-    fn g_tag_parse() {
-        
-    }
+    // TODO -fn apply_highlight() {
+    // TODO -    match shape_element_tag_name_value {
+    // TODO -        "polygon" => {
+    // TODO -            clog!("polygon");
+    // TODO -            if !polygon_element_value.contains(focus_style) {
+    // TODO -                clog!("polygon if !");
+    // TODO -                let mut polygon_element_value = polygon_element_value.to_string();
+    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", polygon_element_value));
+    // TODO -                clog!(format!("qwq: polygon_element_start: {:?}", polygon_element_start));
+    // TODO -                polygon_element_value.insert_str(9, &highlight_style);
+    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", polygon_element_value));
+    // TODO -                let mut g_tag_element_value = g_tag_element_value.to_string();
+    // TODO -                let _ = &g_tag_element_value.replace_range(polygon_element_start..polygon_element_end, &polygon_element_value);
+    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", g_tag_element_value));
+// TODO -
+    // TODO -                let _ = &svg_content_clone.replace_range(g_tag_element_start..g_tag_element_end, &g_tag_element_value);
+// TODO -
+    // TODO -                clog!("OH");
+    // TODO -            } else {
+    // TODO -                clog!("polygon else");
+    // TODO -                let res = polygon_element_value.replace(focus_style, &highlight_style);
+    // TODO -                clog!(format!("qwq: res: {:?}", res));
+    // TODO -                
+    // TODO -                let mut g_tag_element_value = g_tag_element_value.to_string();
+    // TODO -                
+    // TODO -                g_tag_element_value.replace_range(polygon_element_start..polygon_element_end, &res);
+    // TODO -                clog!(format!("qwq: g_tag_element_value: {:?}", g_tag_element_value));
+    // TODO -                
+    // TODO -                let _ = &svg_content_clone.replace_range(g_tag_element_start..g_tag_element_end, &g_tag_element_value);
+// TODO -
+    // TODO -                clog!("OH");
+    // TODO -            }
+    // TODO -        },
+    // TODO -        "g" => {
+    // TODO -            clog!("g");
+    // TODO -        },
+    // TODO -        _ => {
+    // TODO -            clog!("_");
+    // TODO -        }
+    // TODO -    }
+    // TODO -}
 
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {
         clog!("highlight_option");
@@ -281,17 +318,13 @@ impl Entity {
         if let Some(svg_content) = svg_content {
             let capture: Vec<usize> = svg_content.match_indices(focus_style).map(|(index, _)| index + focus_style.len()).collect();
             svg_content_clone = svg_content.clone().to_string();
-            clog!(format!("capture: {:?}", capture));
             for some_g_tag_element in g_tag.captures_iter(&svg_content) {
-                clog!(format!("some_g_tag_element: {:?}", some_g_tag_element));
                 if let Some(g_tag_element) = some_g_tag_element.get(0) {
                     let g_tag_element_start = g_tag_element.start();
                     let g_tag_element_end = g_tag_element.end();
                     let g_tag_element_value = g_tag_element.as_str();
                     for some_data_name_property in data_name_property.captures_iter(&g_tag_element.as_str()) {
-                        clog!(format!("some_data_name_property: {:?}", some_data_name_property));
                         if let Some(data_name_property_value) = some_data_name_property.get(1) {
-                            clog!(format!("data_name_property_value: {:?}", data_name_property_value.as_str()));
 
                             let data_name_properties = some_data_name_property
                             .get(1)
@@ -303,8 +336,10 @@ impl Entity {
                             
                             let equal_slot: bool = if data_name_properties.contains(&slot.unwrap_or("")) &&
                             data_name_properties.contains(&floor_scope.as_str()) {
+                                clog!("true 12d");
                                 true
                             } else {
+                                clog!("false 12d");
                                 false
                             };
 
@@ -321,28 +356,6 @@ impl Entity {
                                         let shape_element_tag_name_start = shape_element_tag_name.start();
                                         let shape_element_tag_name_end =   shape_element_tag_name.end();
                                         let shape_element_tag_name_value = shape_element_tag_name.as_str();
-                                        match shape_element_tag_name_value {
-                                            "polygon" => {
-                                                clog!("polygon");
-                                                let res = polygon_element_value.replace(focus_style, &highlight_style);
-                                                clog!(format!("qwq: res: {:?}", res));
-                                                
-                                                let mut g_tag_element_value = g_tag_element_value.to_string();
-                                                
-                                                g_tag_element_value.replace_range(polygon_element_start..polygon_element_end, &res);
-                                                clog!(format!("qwq: g_tag_element_value: {:?}", g_tag_element_value));
-                                                
-                                                &svg_content_clone.replace_range(g_tag_element_start..g_tag_element_end, &g_tag_element_value);
-
-                                                clog!("OH");
-                                            },
-                                            "g" => {
-                                                clog!("g");
-                                            },
-                                            _ => {
-                                                clog!("_");
-                                            }
-                                        }
                                     }
                                 }
                             }

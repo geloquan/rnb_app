@@ -17,8 +17,6 @@ pub fn y() -> Html {
     match (&ctx.y_option, &ctx.default_floor) {
         (Some(y), floor) if !floor.is_empty() => {
             for option_y in y {
-                clog!(format!("option y: {:?}", option_y));
-                clog!(format!("floor: {:?}", floor));
                 if option_y.1 == floor {
                     let option: Element = document().create_element("option").unwrap();
                     option.set_text_content(Some(&option_y.0));
@@ -78,7 +76,6 @@ pub fn x() -> Html {
                     let target = event.target().unwrap();
                     let val = target.dyn_into::<web_sys::HtmlSelectElement>().unwrap().value();
                     ctx_clone.dispatch(EntityCase::Highlight(val));
-                    clog!(format!("ctx2: {:?}", ctx_clone.svg_content.borrow()));
                     
                 }) as Box<dyn FnMut(_)>);
                     target

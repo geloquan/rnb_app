@@ -172,10 +172,8 @@ fn code(code: &CodeProp) -> Html {
     let checker = {
         let entity_ctx = entity_ctx.clone();
         let borrow = entity_ctx.borrow();
-        clog!(format!("borrow: {:?}", borrow));
         Callback::from(move |_| {
             let borrow = entity_ctx.borrow();
-            clog!(format!("borrow callback: {:?}", borrow));
         })
     };
     html! {
@@ -240,18 +238,14 @@ fn svg_data(code: &CodeProp) -> Html {
     
     match &svg_content.svg_content {
         Some(svge) => {
-            clog!("svg content data rendered");
-            clog!(format!("svg content data rendered {:?}", svge));
             let div: Element = document().create_element("div").unwrap();
             div.set_inner_html(svge);
 
             let checker = {
                 let entity_ctx = context.clone();
                 let borrow = entity_ctx.borrow();
-                clog!(format!("borrow: {:?}", borrow));
                 Callback::from(move |_| {
                     let borrow = entity_ctx.borrow();
-                    clog!(format!("borrow callback: {:?}", borrow));
                 })
             };
 
