@@ -55,7 +55,6 @@ pub fn y() -> Html {
 #[function_component(X)]
 pub fn x() -> Html {
     let ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    let ctx2 = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let select: Element = document().create_element("select").unwrap();
     let borrow = ctx.x_option.borrow();
     if let Some(ref map) = *borrow {
@@ -73,15 +72,18 @@ pub fn x() -> Html {
                     }
                 }
                 let target: EventTarget = select.clone().dyn_into::<EventTarget>().unwrap();
+                let ctx_clone = ctx.clone(); 
                 let closure = Closure::wrap(Box::new(move |event: Event| {
+                    let ctx_clone = ctx_clone.clone(); 
                     let target = event.target().unwrap();
                     let val = target.dyn_into::<web_sys::HtmlSelectElement>().unwrap().value();
-                    clog!("entity");
-                    ctx2.dispatch(EntityCase::Highlight(val));
+                    ctx_clone.dispatch(EntityCase::Highlight(val));
+                    clog!(format!("ctx2: {:?}", ctx_clone.svg_content.borrow()));
+                    
                 }) as Box<dyn FnMut(_)>);
-                target
-                .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())
-                .unwrap();
+                    target
+                    .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())
+                    .unwrap();
                 closure.forget();
                 
                 let node: Node = select.into();

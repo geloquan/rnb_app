@@ -1,4 +1,5 @@
-use std::{borrow::Borrow, cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
+use core::borrow;
+use std::{borrow::{Borrow, BorrowMut}, cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
 
 use gloo_utils::document;
 use http::{header, HeaderMap, StatusCode};
@@ -168,11 +169,23 @@ fn code(code: &CodeProp) -> Html {
         fill: "none !important".to_owned()
     });
     let fallback = html! {<div>{"Loading..."}</div>};
+    let checker = {
+        let entity_ctx = entity_ctx.clone();
+        let borrow = entity_ctx.borrow();
+        clog!(format!("borrow: {:?}", borrow));
+        Callback::from(move |_| {
+            let borrow = entity_ctx.borrow();
+            clog!(format!("borrow callback: {:?}", borrow));
+        })
+    };
     html! {
     <>    
         <ContextProvider<theme::Focus> context={(*focus).clone()}>
         <ContextProvider<theme::Unfocus> context={(*unfocus).clone()}>
         <ContextProvider<EntityContext> context={entity_ctx}>
+            <button onclick={checker}> 
+                {"check svg content"} 
+            </button>
             <Options/> 
             <SvgData code={code.code.clone()}/>
         </ContextProvider<EntityContext>>
@@ -186,7 +199,8 @@ fn code(code: &CodeProp) -> Html {
 fn svg_data(code: &CodeProp) -> Html {
     let code = code.code.clone();
     let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    if entity_ctx.name == "" {
+    if entity_ctx.name.borrow().is_empty() {
+        clog!("is_empty()");
         spawn_local(async move {
             let svg_req = reqwasm::http::Request::get(
                 &format!("http://127.0.0.2:8081/{:?}", code)
@@ -198,13 +212,20 @@ fn svg_data(code: &CodeProp) -> Html {
             match svg_req {
                 Ok(response) => {
                     if response.status_text() == "OK" {
+                        clog!("OK");
                         let body_text = response.text().await.expect("Failed to get body text");
-                        let entity: Result<Entity, serde_json::Error>  = serde_json::from_str(&body_text);
+                        let entity: Result<EntityResponse, serde_json::Error>  = serde_json::from_str(&body_text);
                         
+                        //clog!("OK");
                         if let Ok(mut entity) = entity {
-                            entity_ctx.dispatch(EntityCase::Init(Some(entity)));
+                            clog!("Init");
+                            let ent = entity::Entity::replacee(entity);
+                            entity_ctx.dispatch(EntityCase::Init(Some(ent)));
+                            clog!("ProduceOption");
                             entity_ctx.dispatch(EntityCase::ProduceOption);
+                            clog!("Highlight");
                             entity_ctx.dispatch(EntityCase::Highlight("".to_string()));
+                            clog!(format!("after Highlight: {:?}", entity_ctx));
                         }
                     }
                 },
@@ -213,40 +234,49 @@ fn svg_data(code: &CodeProp) -> Html {
             }
         });
     } 
-
-    let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
-    let borrowed = entity_ctx.svg_content.borrow();
-    if let Some(ref svg) = *borrowed {
+    
+    let context = use_context::<EntityContext>().expect("no Svg Content ctx found");
+    let svg_content = context.svg_content.borrow();
+    
+    match &svg_content.svg_content {
+        Some(svge) => {
+            clog!("svg content data rendered");
+            clog!(format!("svg content data rendered {:?}", svge));
             let div: Element = document().create_element("div").unwrap();
-            div.set_inner_html(svg);
-            //let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
-            //let closure = Closure::wrap(Box::new(move |event: Event| {
-            //    web_sys::console::log_1(&"Event triggered".into());
-            //    
-            //}) as Box<dyn FnMut(_)>);
-//
-            //let clicked = {
-            //    Callback::from(move |event: Event| {
-            //    })
-            //};
-            //
-            //target
-            //.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
-            //.unwrap();
-//
-            //closure.forget();
+            div.set_inner_html(svge);
+
+            let checker = {
+                let entity_ctx = context.clone();
+                let borrow = entity_ctx.borrow();
+                clog!(format!("borrow: {:?}", borrow));
+                Callback::from(move |_| {
+                    let borrow = entity_ctx.borrow();
+                    clog!(format!("borrow callback: {:?}", borrow));
+                })
+            };
 
             let node: Node = div.into();
             return html! {
-                Html::VRef(node)
+            <>
+                <button onclick={checker}> 
+                    {"check svg contente"} 
+                </button>
+                <div>
+                    {Html::VRef(node)}
+                </div>
+            </>
             }
-    } else {
-        return html! {
-            <div>
-                {"upload svg"}
-            </div>
+        }
+        None => {
+            html! {
+                <div>
+                    {"upload svg"}
+                </div>
+            }
         }
     }
+
+
     //match entity_ctx {
     //    Some(ref svg) => {
     //        let div: Element = document().create_element("div").unwrap();
