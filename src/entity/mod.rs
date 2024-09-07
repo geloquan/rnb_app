@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use web_sys::Element;
 use yew::{use_context, Properties, Reducible};
 
-use crate::{_SvgContent::svg, theme::Focus};
+use crate::{_SvgContent::svg, theme::Focus, BuildNestedElement, NestedElement};
 
 #[derive(Debug)]
 pub enum EntityCase {
@@ -251,48 +251,6 @@ impl Entity {
         Ok(svg_raw_content.clone().unwrap_or("".to_string()))
     }
 
-    // TODO -fn apply_highlight() {
-    // TODO -    match shape_element_tag_name_value {
-    // TODO -        "polygon" => {
-    // TODO -            clog!("polygon");
-    // TODO -            if !polygon_element_value.contains(focus_style) {
-    // TODO -                clog!("polygon if !");
-    // TODO -                let mut polygon_element_value = polygon_element_value.to_string();
-    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", polygon_element_value));
-    // TODO -                clog!(format!("qwq: polygon_element_start: {:?}", polygon_element_start));
-    // TODO -                polygon_element_value.insert_str(9, &highlight_style);
-    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", polygon_element_value));
-    // TODO -                let mut g_tag_element_value = g_tag_element_value.to_string();
-    // TODO -                let _ = &g_tag_element_value.replace_range(polygon_element_start..polygon_element_end, &polygon_element_value);
-    // TODO -                clog!(format!("qwq: polygon_element_value: {:?}", g_tag_element_value));
-// TODO -
-    // TODO -                let _ = &svg_content_clone.replace_range(g_tag_element_start..g_tag_element_end, &g_tag_element_value);
-// TODO -
-    // TODO -                clog!("OH");
-    // TODO -            } else {
-    // TODO -                clog!("polygon else");
-    // TODO -                let res = polygon_element_value.replace(focus_style, &highlight_style);
-    // TODO -                clog!(format!("qwq: res: {:?}", res));
-    // TODO -                
-    // TODO -                let mut g_tag_element_value = g_tag_element_value.to_string();
-    // TODO -                
-    // TODO -                g_tag_element_value.replace_range(polygon_element_start..polygon_element_end, &res);
-    // TODO -                clog!(format!("qwq: g_tag_element_value: {:?}", g_tag_element_value));
-    // TODO -                
-    // TODO -                let _ = &svg_content_clone.replace_range(g_tag_element_start..g_tag_element_end, &g_tag_element_value);
-// TODO -
-    // TODO -                clog!("OH");
-    // TODO -            }
-    // TODO -        },
-    // TODO -        "g" => {
-    // TODO -            clog!("g");
-    // TODO -        },
-    // TODO -        _ => {
-    // TODO -            clog!("_");
-    // TODO -        }
-    // TODO -    }
-    // TODO -}
-
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {
         clog!("highlight_option");
 
@@ -304,8 +262,13 @@ impl Entity {
         let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let shape_tag = Regex::new(r#"<(polygon)\b[^>]*>(.*?)"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
+        
         let focus_style = r#"style="stroke: #000000 !important""#;
-        let highlight_style = r#"style="stroke: red !important""#;
+
+        let mut nest: BuildNestedElement = BuildNestedElement {
+            nests: Vec::new(),
+            svg_content: String::new()
+        };
         
         let floor_scope = if let Some(current_floor) = &self.current_floor {
             current_floor
@@ -318,6 +281,7 @@ impl Entity {
         if let Some(svg_content) = svg_content {
             let capture: Vec<usize> = svg_content.match_indices(focus_style).map(|(index, _)| index + focus_style.len()).collect();
             svg_content_clone = svg_content.clone().to_string();
+            nest.svg_content = svg_content.clone().to_string();
             for some_g_tag_element in g_tag.captures_iter(&svg_content) {
                 if let Some(g_tag_element) = some_g_tag_element.get(0) {
                     let g_tag_element_start = g_tag_element.start();
@@ -336,26 +300,31 @@ impl Entity {
                             
                             let equal_slot: bool = if data_name_properties.contains(&slot.unwrap_or("")) &&
                             data_name_properties.contains(&floor_scope.as_str()) {
-                                clog!("true 12d");
                                 true
                             } else {
-                                clog!("false 12d");
                                 false
                             };
 
                             if equal_slot {
                                 for some_shape_tag in shape_tag.captures_iter(&g_tag_element.as_str()) {
-                                    clog!(format!("qwq: some_shape_tag: {:?}", some_shape_tag));
                                     if let (Some(polygon_element), Some(shape_element_tag_name)) = (some_shape_tag.get(0), some_shape_tag.get(1)) {
-                                        clog!(format!("qwq: polygon_element: {:?}", polygon_element));
-                                        clog!(format!("qwq: shape_element_tag_name: {:?}", shape_element_tag_name));
                                         let polygon_element_start = polygon_element.start();
                                         let polygon_element_end =   polygon_element.end();
                                         let polygon_element_value = polygon_element.as_str();
 
-                                        let shape_element_tag_name_start = shape_element_tag_name.start();
-                                        let shape_element_tag_name_end =   shape_element_tag_name.end();
                                         let shape_element_tag_name_value = shape_element_tag_name.as_str();
+
+                                        nest.nests.push(NestedElement {
+                                            polygon_element_start,
+                                            polygon_element_end,
+                                            polygon_element_value: polygon_element_value.to_owned(),
+                                            
+                                            g_tag_element_start,
+                                            g_tag_element_end,
+                                            g_tag_element_value: g_tag_element_value.to_owned(),
+                                            
+                                            shape_element_tag_name_value: shape_element_tag_name_value.to_owned(),
+                                        });
                                     }
                                 }
                             }
@@ -363,40 +332,12 @@ impl Entity {
                     }
                 }
             }
-        clog!(format!("qwq: self.svg_content: {:?}", self.svg_content));
-            for some_data_name_property in data_name_property.captures_iter(&svg_content) {
-                if let Some(data_name_property) = some_data_name_property.get(0) {
-                    clog!(format!("some_data_name_property: {:?}", some_data_name_property));
-                    let raw_range = some_data_name_property.get(0).unwrap();
-                    let end = raw_range.end() as i32;
-                    clog!(format!("end: {:?}", end));
-                    
-                    let data_name_properties = some_data_name_property
-                    .get(1)
-                    .unwrap()
-                    .as_str()
-                    .split(' ')
-                    .collect::<Vec<&str>>();
-
-                    let equal_slot: bool = data_name_properties.iter().any(|data_name_value| {
-                        data_name_value == &slot.unwrap_or("") 
-                    });
-
-                    if equal_slot {
-                        let _ = capture.clone().into_iter().map(|index| {
-                            clog!(format!("index as i32 - end: {:?}", index as i32 - end));
-                            if (0 <= (index as i32 - end)) && ((index as i32 - end) <= 50) {
-                                clog!("hello");
-                            }
-                        }).collect::<Vec<_>>();
-                    }
-                }
-            }
         } else {
 
         }
+        let rr = nest.build();
         
-        Ok(svg_content_clone)
+        Ok(rr)
     }
     
     //pub fn build_svg(&self, entity_case: EntityCase) -> Result<(), &'static str> {

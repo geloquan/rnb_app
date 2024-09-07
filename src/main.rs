@@ -19,8 +19,10 @@ use serde_json::{json, Value};
 use regex::Regex;
 
 mod entity;
-
 use entity::*;
+
+mod svg;
+use svg::*;
 
 #[derive(Properties, PartialEq, Clone)]
 struct SessionToken {
