@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use web_sys::Element;
 use yew::{use_context, Properties, Reducible};
 
-use crate::{_SvgContent::svg, theme::Focus, BuildNestedElement, NestedElement};
+use crate::{_SvgContent::svg, theme::Focus, BuildNestedElement, EntityContext, NestedElement};
 
 #[derive(Debug)]
 pub enum EntityCase {
@@ -17,7 +17,8 @@ pub enum EntityCase {
 
     Init(Option<Entity>),
     Highlight(String),
-    ProduceOption
+    ProduceOption,
+    AddOptionX(String)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -32,15 +33,24 @@ pub struct SvgContentt {
     pub svg_content: Option<String>
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
+pub struct OptionXY {
+    pub x: Option<String>,
+    pub y: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
+pub struct OptionX {
+    pub data: Option<HashMap<String, String>>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
 pub struct Entity {
     pub name: RefCell<String>,
     pub svg_raw_content: RefCell<Option<String>>,
     pub svg_content: RefCell<SvgContentt>,
     pub svg_content_app: Option<String>,
     pub default_floor: String,
-    pub current_floor: Option<String>,
+    pub current_option: RefCell<OptionXY>,
 
-    pub x_option: RefCell<Option<HashMap<String, String>>>,
+    pub x_option: RefCell<OptionX>,
     pub y_option: Option<HashMap<String, String>>,
 
     pub focus_option: Option<String>,
@@ -65,8 +75,9 @@ impl Reducible for Entity {
                 let new_string = self.clone().highlight_option(Some(&highlight));
                 match new_string {
                     Ok(string) => {
-                        let mut svg_content = Entity::mutate(&mut self);
-                        svg_content.svg_content = Some(string);
+                        let mut tuple = Entity::mutate_to_highlight(&mut self);
+                        tuple.0.svg_content = Some(string.clone());
+                        tuple.1.x = Some(string.clone());
                     },
                     Err(e) => {
                         clog!(e);
@@ -74,28 +85,51 @@ impl Reducible for Entity {
                 }
             },
             EntityCase::ProduceOption => {
-                let new_string = self.clone().produce_option(None).unwrap();
-                let mut svg_content = Entity::mutate(&mut self);
-                svg_content.svg_content = Some(new_string);
+                let new = self.clone().produce_option(None).unwrap();
+                let new_string = new.0;
+                let new_option_x = new.1;
+
+                let mut svg_content = Entity::mutate_produce_option(&mut self);
+                svg_content.0.svg_content = Some(new_string);
+                svg_content.1.data = Some(new_option_x);
+            },
+            EntityCase::AddOptionX(x) => {
+                
             }
         } 
         self
     }
 }
 impl Entity {
-    fn mutate<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = SvgContentt> {
+    fn mutate_to_highlight<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionXY>) {
+        let this = Rc::make_mut(self);
+        (this.svg_content.borrow_mut(), this.current_option.borrow_mut())
+    }
+
+    fn mutate_svg_content<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = SvgContentt> {
         let this = Rc::make_mut(self);
         this.svg_content.borrow_mut()
     }
-    pub fn replacee(entity_response: EntityResponse) -> Self {
+    
+    fn mutate_produce_option<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionX>) {
+        let this = Rc::make_mut(self);
+        (this.svg_content.borrow_mut(), this.x_option.borrow_mut())
+    }
+
+    fn mutate_option_x<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = OptionX> {
+        let this = Rc::make_mut(self);
+        this.x_option.borrow_mut()
+    }
+
+    pub fn to_entity(entity_response: EntityResponse) -> Self {
         Self {
             name: entity_response.name.into(),
             svg_raw_content: entity_response.svg_raw_content.into(),
             svg_content: SvgContentt {svg_content: None}.into(),
             svg_content_app: None,
             default_floor: entity_response.default_floor,
-            current_floor: None,
-            x_option: None.into(),
+            current_option: OptionXY {x: None, y: None}.into(),
+            x_option: OptionX {data: None}.into(),
             y_option: None,
             focus_option: None,
             classes: None,
@@ -109,8 +143,8 @@ impl Entity {
             svg_content: SvgContentt {svg_content: None}.into(),
             svg_content_app: None,
             default_floor: "".to_string(),
-            current_floor: None,
-            x_option: None.into(),
+            current_option: OptionXY {x: None, y: None}.into(),
+            x_option: OptionX {data: None}.into(),
             y_option: None,
             focus_option: None,
             classes: None,
@@ -126,7 +160,7 @@ impl Entity {
         //self.svg_content.borrow().is_some() &&
         self.default_floor != ""
     }
-    pub fn produce_option(& self, floor: Option<&str>) -> Result<String, &'static str> {
+    pub fn produce_option(& self, floor: Option<&str>) -> Result<(String, HashMap<String, String>), &'static str> {
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
@@ -136,7 +170,7 @@ impl Entity {
         let focus_style = r#"style="stroke: #000000 !important""#;
         let unfocus_style = r#"style="stroke: none !important; fill: none !important""#;
 
-        let mut _x: HashMap<String, bool> = HashMap::new();
+        let mut x: HashMap<String, String> = HashMap::new();
 
         let mut ranges: Vec<Range<i32>> = Vec::new();
             
@@ -177,18 +211,16 @@ impl Entity {
                             if data_name_value.contains("floor-") {
                                 continue;
                             } else {
-                                let mut borrow = self.x_option.borrow_mut();
-                                match (borrow.clone(), self.default_floor.clone(), floor) {
-                                    (Some(_), _, Some(floor)) => {
-                                        borrow.as_mut().unwrap().insert(data_name_value.to_string(), floor.to_string());
+                                let mut borrow = self.x_option.borrow();
+                                match (self.default_floor.clone(), floor) {
+                                    (_, Some(floor)) => {
+                                        x.insert(data_name_value.to_string(), floor.to_string());
                                     },
-                                    (Some(_), default_floor_, None) => {
-                                        borrow.as_mut().unwrap().insert(data_name_value.to_string(), default_floor_.to_string());
+                                    (default_floor_, None) => {
+                                        x.insert(data_name_value.to_string(), default_floor_.to_string());
                                     },
-                                    (None, default_floor_, _) => {
-                                        let mut temp = HashMap::new(); 
-                                        temp.insert(data_name_value.to_string(), default_floor_.to_string());
-                                        borrow.replace(temp);
+                                    (default_floor_, _) => {
+                                        x.insert(data_name_value.to_string(), default_floor_.to_string());
                                     }
     
                                 }
@@ -248,7 +280,7 @@ impl Entity {
             }
         }
         //self.svg_content.borrow_mut().replace(svg_raw_content.clone().unwrap_or("".to_string()));
-        Ok(svg_raw_content.clone().unwrap_or("".to_string()))
+        Ok((svg_raw_content.clone().unwrap_or("".to_string()), x.to_owned()))
     }
 
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {
@@ -269,11 +301,12 @@ impl Entity {
             nests: Vec::new(),
             svg_content: String::new()
         };
+        let current_y = self.current_option.borrow().y.clone();
         
-        let floor_scope = if let Some(current_floor) = &self.current_floor {
-            current_floor
+        let floor_scope = if let Some(current_y) = current_y {
+            current_y
         } else {
-            &self.default_floor
+            self.default_floor.clone()
         };
         
         let svg_content = &self.svg_content.borrow().svg_content;

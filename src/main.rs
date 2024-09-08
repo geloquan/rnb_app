@@ -219,7 +219,7 @@ fn svg_data(code: &CodeProp) -> Html {
                         //clog!("OK");
                         if let Ok(mut entity) = entity {
                             clog!("Init");
-                            let ent = entity::Entity::replacee(entity);
+                            let ent = entity::Entity::to_entity(entity);
                             entity_ctx.dispatch(EntityCase::Init(Some(ent)));
                             clog!("ProduceOption");
                             entity_ctx.dispatch(EntityCase::ProduceOption);
