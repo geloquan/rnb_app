@@ -77,7 +77,7 @@ impl Reducible for Entity {
                     Ok(string) => {
                         let mut tuple = Entity::mutate_to_highlight(&mut self);
                         tuple.0.svg_content = Some(string.clone());
-                        tuple.1.x = Some(string.clone());
+                        tuple.1.x = Some(highlight.clone());
                     },
                     Err(e) => {
                         clog!(e);
@@ -161,6 +161,7 @@ impl Entity {
         self.default_floor != ""
     }
     pub fn produce_option(& self, floor: Option<&str>) -> Result<(String, HashMap<String, String>), &'static str> {
+        clog!("produce_option");
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
