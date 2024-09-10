@@ -1,10 +1,19 @@
 
+use std::fmt::format;
+
+use gloo::console::log as clog;
+use gloo_utils::document;
+use wasm_bindgen::{prelude::Closure, JsCast};
+use yew::{function_component, html, use_context, Event, Html};
+use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlInputElement, Node, Storage};
+
+use crate::{EntityContext, _Entity::default_floor, entity, Entity, EntityCase};
 
 #[function_component(Y)]
 pub fn y() -> Html {
     let ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let select: Element = document().create_element("select").unwrap();
-    let borrow = ctx.y_.borrow();
+    let borrow = ctx.y_option.borrow();
     let current_option_borrow = ctx.current_option.borrow();
     match &borrow.data {
         Some(map) => {

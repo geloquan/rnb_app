@@ -19,6 +19,7 @@ pub enum EntityCase {
     Hydrate,
     Highlight(String),
     ProduceOption(Option<String>),
+    ShiftY(String),
     Floor(String)
 }
 
@@ -104,6 +105,9 @@ impl Reducible for Entity {
                 svg_content.1.data = Some(new_option_x);
                 svg_content.2.data = Some(new_option_y);
             },
+            EntityCase::ShiftY(floor_name) => {
+
+            }
         } 
         self
     }
