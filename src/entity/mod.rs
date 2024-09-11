@@ -98,16 +98,13 @@ impl Reducible for Entity {
                 let new = self.clone().produce_option(floor_str).unwrap();
                 let new_string = new.0;
                 let new_option_x = new.1;
-                let new_option_y = new.1;
+                let new_option_y = new.2;
 
                 let mut svg_content = Entity::mutate_produce_option(&mut self);
                 svg_content.0.svg_content = Some(new_string);
                 svg_content.1.data = Some(new_option_x);
                 svg_content.2.data = Some(new_option_y);
             },
-            EntityCase::ShiftY(floor_name) => {
-
-            }
         } 
         self
     }

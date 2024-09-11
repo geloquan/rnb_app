@@ -8,7 +8,8 @@ use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlInp
 
 use crate::{EntityContext, _Entity::default_floor, entity, Entity, EntityCase};
 
-mod y;
+pub mod y;
+use y::Y;
 
 #[function_component(X)]
 pub fn x() -> Html {

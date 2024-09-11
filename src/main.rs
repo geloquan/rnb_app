@@ -144,15 +144,18 @@ struct OptionProps {
     x: Option<HashMap<String, bool>>,
     y: Option<HashMap<String, bool>>
 }
+
+pub mod option;
+use option::*;
+
 //LINK - Options
-mod option;
 #[function_component(Options)]
 fn options() -> Html {
     let entity_ctx = use_context::<EntityContext>().expect("no svg ctx");
     
     html! {
     <>
-        <option::Y />
+        <option::y::Y />
         <option::X />
     </>
     }
@@ -218,14 +221,10 @@ fn svg_data(code: &CodeProp) -> Html {
                         
                         //clog!("OK");
                         if let Ok(mut entity) = entity {
-                            clog!("Init");
                             let ent = entity::Entity::to_entity(entity);
                             entity_ctx.dispatch(EntityCase::Init(Some(ent)));
-                            clog!("ProduceOption");
-                            entity_ctx.dispatch(EntityCase::ProduceOption);
-                            clog!("Highlight");
+                            entity_ctx.dispatch(EntityCase::ProduceOption(None));
                             entity_ctx.dispatch(EntityCase::Highlight("".to_string()));
-                            clog!(format!("after Highlight: {:?}", entity_ctx));
                         }
                     }
                 },

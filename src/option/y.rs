@@ -37,14 +37,12 @@ pub fn y() -> Html {
                     let _ = select.append_child(&option);
                 }
             }
-            for option_x in map {
-                if *option_x.1 == *floor {
-                    let option: Element = document().create_element("option").unwrap();
-                    option.set_text_content(Some(&option_x.0));
-                    let _ = option.set_attribute("value", &option_x.0);
+            for option_y in sorted_vec {
+                let option: Element = document().create_element("option").unwrap();
+                option.set_text_content(Some(&option_y.0));
+                let _ = option.set_attribute("value", &option_y.0);
 
-                    let _ = select.append_child(&option);
-                }
+                let _ = select.append_child(&option);
             }
 
             let target: EventTarget = select.clone().dyn_into::<EventTarget>().unwrap();
@@ -54,7 +52,7 @@ pub fn y() -> Html {
                 let target = event.target().unwrap();
                 let element = target.dyn_into::<web_sys::HtmlSelectElement>().unwrap();
                 let val = element.value();
-                ctx_clone.dispatch(EntityCase::Highlight(val));
+                ctx_clone.dispatch(EntityCase::ProduceOption(Some(val)));
             }) as Box<dyn FnMut(_)>);
             target
             .add_event_listener_with_callback("change", closure.as_ref().unchecked_ref())
