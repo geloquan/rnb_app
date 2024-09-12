@@ -1,4 +1,3 @@
-
 use std::fmt::format;
 
 use gloo::console::log as clog;
@@ -19,6 +18,7 @@ pub fn y() -> Html {
         Some(map) => {
             let mut sorted_vec: Vec<(&String, &String)> = map.iter().collect();
             sorted_vec.sort_by(|a, b| a.0.cmp(b.0));
+            let current_floor = &ctx.default_floor;
             match &current_option_borrow.y {
                 Some(s) => {
                     let option: Element = document().create_element("option").unwrap();
@@ -31,18 +31,20 @@ pub fn y() -> Html {
                 None => {
                     let option: Element = document().create_element("option").unwrap();
                     option.set_text_content(Some(&ctx.default_floor));
-                    let _ = option.set_attribute("value", &ctx.default_floor);
+                    let _ = option.set_attribute("value", current_floor);
                     let _ = option.set_attribute("selected", "");
                     let _ = option.set_attribute("disabled", "");
                     let _ = select.append_child(&option);
                 }
             }
             for option_y in sorted_vec {
-                let option: Element = document().create_element("option").unwrap();
-                option.set_text_content(Some(&option_y.0));
-                let _ = option.set_attribute("value", &option_y.0);
-
-                let _ = select.append_child(&option);
+                if option_y.0 != current_floor {
+                    let option: Element = document().create_element("option").unwrap();
+                    option.set_text_content(Some(&option_y.0));
+                    let _ = option.set_attribute("value", &option_y.0);
+    
+                    let _ = select.append_child(&option);
+                } 
             }
 
             let target: EventTarget = select.clone().dyn_into::<EventTarget>().unwrap();

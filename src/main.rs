@@ -156,7 +156,7 @@ fn options() -> Html {
     html! {
     <>
         <option::y::Y />
-        <option::X />
+        <option::x::X />
     </>
     }
 }

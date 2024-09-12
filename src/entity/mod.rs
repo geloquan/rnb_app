@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use web_sys::Element;
 use yew::{use_context, Properties, Reducible};
 
-use crate::{_SvgContent::svg, theme::Focus, BuildNestedElement, EntityContext, NestedElement};
+use crate::{_SvgContent::svg, entity, theme::Focus, BuildNestedElement, EntityContext, NestedElement};
 
 #[derive(Debug)]
 pub enum EntityCase {
@@ -16,11 +16,8 @@ pub enum EntityCase {
     //Editor,
 
     Init(Option<Entity>),
-    Hydrate,
     Highlight(String),
     ProduceOption(Option<String>),
-    ShiftY(String),
-    Floor(String)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -61,7 +58,7 @@ pub struct Entity {
 
     pub focus_option: Option<String>,
     
-    pub classes: Option<HashMap<(String, String), bool>>,
+    pub element: Option<HashMap<(String, String), bool>>,
     pub data_name: Option<HashMap<String, bool>>,
 }
 impl Reducible for Entity {
@@ -75,11 +72,6 @@ impl Reducible for Entity {
                     },
                     None => return Entity::new().into()
                 }
-            },
-            EntityCase::Hydrate => {
-                let y_option = self.clone().produce_option_y().unwrap();
-                let mut option = Entity::mutate_option(&mut self);
-                option.y = Some(y_option);
             },
             EntityCase::Highlight(highlight) => {
                 let new_string = self.clone().highlight_option(Some(&highlight));
@@ -140,6 +132,7 @@ impl Entity {
         this.current_option.borrow_mut()
     }
 
+
     pub fn to_entity(entity_response: EntityResponse) -> Self {
         Self {
             name: entity_response.name.into(),
@@ -151,7 +144,7 @@ impl Entity {
             x_option: OptionX {data: None}.into(),
             y_option: OptionY {data: None}.into(),
             focus_option: None,
-            classes: None,
+            element: None,
             data_name: None,
         }
     }
@@ -166,7 +159,7 @@ impl Entity {
             x_option: OptionX {data: None}.into(),
             y_option: OptionY {data: None}.into(),
             focus_option: None,
-            classes: None,
+            element: None,
             data_name: None,
         }
     }
@@ -184,6 +177,26 @@ impl Entity {
         
         Ok(option)
     }
+    fn process_string(input: &str) -> String {
+        let re = Regex::new(r"-(\d+)(?:(_[^_]+)?|-[^-_]+)").unwrap();
+        let mut found_number = false;
+        
+        re.replace_all(input, |caps: &regex::Captures| {
+            if let Some(_) = caps.get(1) {
+                // Check if the number has already been found
+                if !found_number {
+                    found_number = true;
+                    format!("-{}", &caps[1])  // Retain the first -[number]
+                } else {
+                    "".to_string()  // Remove any subsequent matches
+                }
+            } else if let Some(_) = caps.get(2) {
+                "-_".to_string()  // Retain the -_ if present
+            } else {
+                "".to_string()  // Remove anything else
+            }
+        }).to_string()
+    }
     pub fn produce_option(& self, floor: Option<String>) -> Result<(String, HashMap<String, String>, HashMap<String, String>), &'static str> {
         clog!("produce_option");
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
@@ -191,7 +204,12 @@ impl Entity {
         let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
         let _shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
         let _class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
+        
+        let floor_value = Regex::new(r#"floor\S*"#).unwrap();
+        let data_name_property = Regex::new(r#"id="([^"]+)""#).unwrap();
 
+        let g_element = Regex::new(r#"<\s*>\s*<g[^>]*>"#).unwrap();
+        
         let focus_style = r#"style="stroke: #000000 !important""#;
         let unfocus_style = r#"style="stroke: none !important; fill: none !important""#;
 
@@ -199,27 +217,39 @@ impl Entity {
         let mut y: HashMap<String, String> = HashMap::new();
 
         let mut ranges: Vec<Range<i32>> = Vec::new();
-            
         let mut to_focus_ranges: Vec<Range<i32>> = Vec::new();
         
         let mut svg_raw_content = self.svg_raw_content.borrow().clone();
+        let current_option = self.current_option.borrow().clone();
 
         if let Some(svg_raw_content) = &svg_raw_content {
             for some_data_name_property in data_name_property.captures_iter(&svg_raw_content) {
-                if let Some(data_name_property) = some_data_name_property.get(0) {
+                if let (Some(data_name_property), Some(data_name_value)) = (some_data_name_property.get(0), some_data_name_property.get(1)) {
+                    
                     let raw_range = some_data_name_property.get(0).unwrap();
                     let start = raw_range.start() as i32;
                     let end = raw_range.end() as i32;
 
-                    let data_name_properties = some_data_name_property
+                    let data_name_properties_vec = some_data_name_property
                     .get(1)
                     .unwrap()
-                    .as_str()
-                    .split(' ')
+                    .as_str(); 
+
+                    let processed_string = entity::Entity::process_string(data_name_properties_vec);
+
+                    let data_name_properties = processed_string
+                    .split('_') 
                     .collect::<Vec<&str>>();
+                    
+                    //clog!(format!("data_name_property: {:?}", data_name_property));
+                    clog!(format!("data_name_properties: {:?}", data_name_properties));
+
+                    let floor: String = floor.clone().unwrap_or("".to_string());
+
+                    let floor_ref: &str = floor.as_str();
 
                     if data_name_properties.contains(&self.default_floor.as_str()) ||
-                    data_name_properties.contains(&floor.unwrap_or("")) 
+                    data_name_properties.contains(&floor_ref) 
                     {
                         to_focus_ranges.push(start..end);
                     } 
@@ -227,54 +257,33 @@ impl Entity {
                     ranges.push(start..end);
 
                     let equal_floor: bool = data_name_properties.iter().any(|data_name_value| {
-                        data_name_value == &floor.unwrap_or("") ||
+                        data_name_value == &floor.clone() ||
                         data_name_value == &self.default_floor
                     });
 
+                    for data_name_value in data_name_properties.iter() {
+                        if data_name_value.contains("floor-") {
+                            y.insert(data_name_value.to_string(), data_name_value.to_string());
+                        }
+                    }
 
                     if equal_floor {
                         for data_name_value in data_name_properties.iter() {
-                            if data_name_value.contains("floor-") {
-                                y.insert(data_name_value.to_string(), data_name_value.to_string());
-                            } else {
-                                let mut borrow = self.x_option.borrow();
-                                match (self.default_floor.clone(), floor) {
-                                    (_, Some(floor)) => {
-                                        x.insert(data_name_value.to_string(), floor.to_string());
-                                    },
-                                    (default_floor_, None) => {
-                                        x.insert(data_name_value.to_string(), default_floor_.to_string());
-                                    },
-                                    (default_floor_, _) => {
-                                        x.insert(data_name_value.to_string(), default_floor_.to_string());
-                                    }
-    
+                            let mut borrow = self.x_option.borrow();
+                            match (self.default_floor.clone(), &floor_ref) {
+                                (_, floor) if !floor.is_empty() => {
+                                    x.insert(data_name_value.to_string(), floor.to_string());
+                                },
+                                (default_floor_, floor) if !floor.is_empty() => {
+                                    x.insert(data_name_value.to_string(), default_floor_.to_string());
+                                },
+                                (default_floor_, _) => {
+                                    x.insert(data_name_value.to_string(), default_floor_.to_string());
                                 }
+
                             }
                         }
                     } 
-                    //for data_name_value in data_name_properties.iter() {
-                    //    if data_name_value.contains("floor-") {
-                    //        continue;
-                    //    } else {
-                    //        clog!(format!("data_name_value {:?}", data_name_value));
-                    //        
-                    //    }
-                    //    //match &mut self.y_option {
-                    //    //    Some(vec) => {
-                    //    //        for data_name_value_2 in data_name_properties.clone() {
-                    //    //            vec.insert(data_name_value_2.to_string(), data_name_value.to_string());
-                    //    //        }
-                    //    //    }
-                    //    //    None => {
-                    //    //        let mut  temp = HashMap::new(); 
-                    //    //        for data_name_value_2 in data_name_properties.clone() {
-                    //    //            temp.insert(data_name_value_2.to_string(), data_name_value.to_string());
-                    //    //        }
-                    //    //        self.y_option = Some(temp);
-                    //    //    }
-                    //    //}
-                    //}
                 }
             }
         }
@@ -286,8 +295,9 @@ impl Entity {
                 .into_iter()
                 .filter(|range| unique_ranges.insert((range.start, range.end)))
                 .collect();
+
             let mut to_focus_unique_ranges = HashSet::new();
-            let mut to_focus_unique_ranges_vec: Vec<Range<i32>> = to_focus_ranges
+            let to_focus_unique_ranges_vec: Vec<Range<i32>> = to_focus_ranges
                 .clone()
                 .into_iter()
                 .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
@@ -300,11 +310,11 @@ impl Entity {
                     } else {
                         svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
                     }
-        
                     unique_ranges_vec.pop();
                 } 
             }
         }
+
         Ok((svg_raw_content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned()))
     }
 
@@ -313,8 +323,6 @@ impl Entity {
 
         if slot.is_none() { return Err("nothing to process") }
         else if slot.unwrap() == self.focus_option.clone().unwrap_or("".to_string()) { return Err("nothing to process") }
-        //self.svg_content = None;
-        //self.svg_content.borrow_mut().replace("".to_string());
 
         let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let shape_tag = Regex::new(r#"<(polygon)\b[^>]*>(.*?)"#).unwrap();
@@ -354,7 +362,6 @@ impl Entity {
                             .as_str()
                             .split(' ')
                             .collect::<Vec<&str>>();
-                            clog!(format!("data_name_properties: {:?}", data_name_properties));
                             
                             let equal_slot: bool = if data_name_properties.contains(&slot.unwrap_or("")) &&
                             data_name_properties.contains(&floor_scope.as_str()) {
@@ -397,17 +404,4 @@ impl Entity {
         
         Ok(rr)
     }
-    
-    //pub fn build_svg(&self, entity_case: EntityCase) -> Result<(), &'static str> {
-    //    if self.has_all_values() { return Err("one of the property may be empty"); }
-    //    match entity_case {
-    //        EntityCase::Code => {
-//
-    //            Ok(())
-    //        }
-    //        EntityCase::Editor => {
-    //            Ok(())
-    //        },
-    //    }
-    //}
 }
