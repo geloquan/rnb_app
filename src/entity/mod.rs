@@ -45,6 +45,10 @@ pub struct OptionY {
     pub data: Option<HashMap<String, String>>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
+pub struct ElementData {
+    pub data: Option<HashMap<(String, String, Range<i32>), bool>>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
 pub struct Entity {
     pub name: RefCell<String>,
     pub svg_raw_content: RefCell<Option<String>>,
@@ -58,7 +62,7 @@ pub struct Entity {
 
     pub focus_option: Option<String>,
     
-    pub element: Option<HashMap<(String, String), bool>>,
+    pub element: RefCell<ElementData>,
     pub data_name: Option<HashMap<String, bool>>,
 }
 impl Reducible for Entity {
@@ -91,11 +95,13 @@ impl Reducible for Entity {
                 let new_string = new.0;
                 let new_option_x = new.1;
                 let new_option_y = new.2;
+                let new_slots = new.3;
 
                 let mut svg_content = Entity::mutate_produce_option(&mut self);
                 svg_content.0.svg_content = Some(new_string);
                 svg_content.1.data = Some(new_option_x);
                 svg_content.2.data = Some(new_option_y);
+                svg_content.3.data = Some(new_slots);
             },
         } 
         self
@@ -117,9 +123,9 @@ impl Entity {
         this.svg_content.borrow_mut()
     }
     
-    fn mutate_produce_option<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionX>, impl 'a + DerefMut<Target = OptionY>) {
+    fn mutate_produce_option<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionX>, impl 'a + DerefMut<Target = OptionY>, impl 'a + DerefMut<Target = ElementData>) {
         let this = Rc::make_mut(self);
-        (this.svg_content.borrow_mut(), this.x_option.borrow_mut(), this.y_option.borrow_mut())
+        (this.svg_content.borrow_mut(), this.x_option.borrow_mut(), this.y_option.borrow_mut(), this.element.borrow_mut())
     }
 
     fn mutate_option_x<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = OptionX> {
@@ -144,7 +150,7 @@ impl Entity {
             x_option: OptionX {data: None}.into(),
             y_option: OptionY {data: None}.into(),
             focus_option: None,
-            element: None,
+            element: ElementData {data: None}.into(),
             data_name: None,
         }
     }
@@ -159,7 +165,7 @@ impl Entity {
             x_option: OptionX {data: None}.into(),
             y_option: OptionY {data: None}.into(),
             focus_option: None,
-            element: None,
+            element: ElementData {data: None}.into(),
             data_name: None,
         }
     }
@@ -197,7 +203,7 @@ impl Entity {
             }
         }).to_string()
     }
-    pub fn produce_option(& self, floor: Option<String>) -> Result<(String, HashMap<String, String>, HashMap<String, String>), &'static str> {
+    pub fn produce_option(& self, floor: Option<String>) -> Result<(String, HashMap<String, String>, HashMap<String, String>, HashMap<(String, String, Range<i32>), bool>), &'static str> {
         clog!("produce_option");
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let floor_value = Regex::new(r#"floor\S*"#).unwrap();
@@ -215,6 +221,10 @@ impl Entity {
 
         let mut x: HashMap<String, String> = HashMap::new();
         let mut y: HashMap<String, String> = HashMap::new();
+        
+        // (id, data-name, style-range)
+        let mut element: HashMap<(String, String, Range<i32>), bool> = HashMap::new();
+        element.extend(self.element.borrow().data.clone().unwrap_or(HashMap::new()));
 
         let mut ranges: Vec<Range<i32>> = Vec::new();
         let mut to_focus_ranges: Vec<Range<i32>> = Vec::new();
@@ -234,15 +244,14 @@ impl Entity {
                     .get(1)
                     .unwrap()
                     .as_str(); 
-
+                    
                     let processed_string = entity::Entity::process_string(data_name_properties_vec);
 
                     let data_name_properties = processed_string
                     .split('_') 
                     .collect::<Vec<&str>>();
                     
-                    //clog!(format!("data_name_property: {:?}", data_name_property));
-                    clog!(format!("data_name_properties: {:?}", data_name_properties));
+                    clog!(format!("data_name_value: {:?}", data_name_value));
 
                     let floor: String = floor.clone().unwrap_or("".to_string());
 
@@ -255,6 +264,9 @@ impl Entity {
                     } 
 
                     ranges.push(start..end);
+                    for data_name_property in &data_name_properties {
+                        element.insert((data_name_value.as_str().to_string(), data_name_property.to_string(), start..end), true);
+                    }
 
                     let equal_floor: bool = data_name_properties.iter().any(|data_name_value| {
                         data_name_value == &floor.clone() ||
@@ -302,20 +314,38 @@ impl Entity {
                 .into_iter()
                 .filter(|range| to_focus_unique_ranges.insert((range.start, range.end)))
                 .collect();
-    
+            
+            
+            let mut sorted_elements: Vec<_> = element.clone().into_iter().collect();
+            sorted_elements.sort_by(|a, b| a.0 .1.end.cmp(&b.0 .1.end));
+            clog!(format!("sorted elements: {:?}", sorted_elements));
+            clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
             if let Some(ref mut svg_raw_content) = svg_raw_content {
-                while let Some(last_element) = unique_ranges_vec.last() {
-                    if to_focus_unique_ranges_vec.contains(last_element) {
-                        svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
+                while let Some(ele) = sorted_elements.last() {
+                    if to_focus_unique_ranges_vec.iter().any(|range| {
+                        clog!(format!("range: {:?}", range));
+                        clog!(format!("ele.0.1: {:?}", ele.0.1));
+                        if let Some(substring) = svg_raw_content.get(range.start as usize..range.end as usize) {
+                            clog!("Substring: {}", substring);
+                        };
+                        range.contains(&(ele.0.1.end as i32)) ||
+                        range.end == ele.0.1.end as i32
+                    }) {
+                        svg_raw_content.insert_str((ele.0.1.end).try_into().unwrap(), focus_style);
                     } else {
-                        svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
+                        svg_raw_content.insert_str((ele.0.1.end).try_into().unwrap(), unfocus_style);
                     }
-                    unique_ranges_vec.pop();
-                } 
+                    sorted_elements.pop();
+                }
+                    //if to_focus_unique_ranges_vec.contains(last_element) {
+                    //    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
+                    //} else {
+                    //    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
+                    //}
             }
         }
 
-        Ok((svg_raw_content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned()))
+        Ok((svg_raw_content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned(), element.to_owned()))
     }
 
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {
