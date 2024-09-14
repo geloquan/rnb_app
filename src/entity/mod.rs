@@ -1,6 +1,5 @@
 use std::{borrow::{Borrow, BorrowMut}, cell::RefCell, collections::{HashMap, HashSet}, ops::{Deref, DerefMut, Range}, rc::Rc, vec};
 
-use _Entity::{data_name, default_floor};
 use gloo::console::log as clog;
 use gloo_utils::document;
 use regex::Regex;
@@ -216,7 +215,7 @@ impl Entity {
 
         let g_element = Regex::new(r#"<\s*>\s*<g[^>]*>"#).unwrap();
         
-        let focus_style = r#"style="stroke: red !important""#;
+        let focus_style = r#"style="stroke: blue !important""#;
         let unfocus_style = r#"style="stroke: none !important; fill: none !important""#;
 
         let mut x: HashMap<String, String> = HashMap::new();
@@ -229,10 +228,17 @@ impl Entity {
         let mut ranges: Vec<Range<i32>> = Vec::new();
         let mut to_focus_ranges: Vec<Range<i32>> = Vec::new();
         
-        let mut svg_raw_content = self.svg_raw_content.borrow().clone();
+        //let mut svg_raw_content = self.svg_raw_content.borrow().clone();
+        let mut content: Option<String> = if let Some(svg_content_data) = self.svg_content.borrow().clone().svg_content {
+            Some(svg_content_data)
+        } else if let Some(svg_raw_content) = self.svg_raw_content.borrow().clone() {
+            Some(svg_raw_content)
+        } else {
+            None
+        };
         let current_option = self.current_option.borrow().clone();
 
-        if let Some(svg_raw_content) = &svg_raw_content {
+        if let Some(svg_raw_content) = &content {
             for some_data_name_property in data_name_property.captures_iter(&svg_raw_content) {
                 if let (Some(data_name_property), Some(data_name_value)) = (some_data_name_property.get(0), some_data_name_property.get(1)) {
                     
@@ -324,7 +330,7 @@ impl Entity {
             clog!(format!("sorted elements: {:?}", sorted_elements));
             clog!(format!("unique_ranges_vec: {:?}", unique_ranges_vec));
             clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
-            if let Some(ref mut svg_raw_content) = svg_raw_content {
+            if let Some(ref mut svg_raw_content) = content {
                 for unique_ranges_vece in &unique_ranges_vec {
                     let closing_bracket: Option<usize> = svg_raw_content.chars().skip(unique_ranges_vece.end as usize).position(|c| c == '>').map(|pos| pos + unique_ranges_vece.end as usize);
                     if let Some(closing_bracket) = closing_bracket {
@@ -332,33 +338,35 @@ impl Entity {
                         if unique_ranges_vece.end as usize <= closing_bracket && closing_bracket <= svg_raw_content.len() {
                             clog!(format!("closing_bracket1: {:?}", closing_bracket));
                             let substring = &svg_raw_content[unique_ranges_vece.end as usize..closing_bracket];
-                            clog!(format!("substring: {:?}", substring));
                             if let Some(pos) = substring.find(focus_style) {
-                                clog!("REPLACE");
                                 let replace_start = unique_ranges_vece.end as usize + pos;
                                 let replace_end = replace_start + focus_style.len();
-
+                                
                                 if to_focus_unique_ranges_vec.iter().any(|to_range| {
                                     to_range.end == unique_ranges_vece.end
                                 }){
-                                    clog!("focus_style replace");
                                     svg_raw_content.replace_range(replace_start..replace_end, focus_style);
                                 } else {
-                                    clog!("unfocus_style replace");
                                     svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
                                 }
+                            } else if let Some(pos) = substring.find(unfocus_style) {
+                                let replace_start = unique_ranges_vece.end as usize + pos;
+                                let replace_end = replace_start + focus_style.len();
                                 
-                                svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
+                                if to_focus_unique_ranges_vec.iter().any(|to_range| {
+                                    to_range.end == unique_ranges_vece.end
+                                }){
+                                    svg_raw_content.replace_range(replace_start..replace_end, focus_style);
+                                } else {
+                                    svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
+                                }
                             } else {
-                                clog!("NOT REPLACE");
                                 if to_focus_unique_ranges_vec.iter().any(|to_range| {
                                     to_range.end == unique_ranges_vece.end
                                 })
                                 {
-                                    clog!("focus_style");
                                     svg_raw_content.insert_str((unique_ranges_vece.end).try_into().unwrap(), focus_style);
                                 } else {
-                                    clog!("unfocus_style");
                                     svg_raw_content.insert_str((unique_ranges_vece.end).try_into().unwrap(), unfocus_style);
                                 }
                             }
@@ -393,7 +401,7 @@ impl Entity {
             }
         }
 
-        Ok((svg_raw_content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned(), element.to_owned()))
+        Ok((content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned(), element.to_owned()))
     }
 
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {

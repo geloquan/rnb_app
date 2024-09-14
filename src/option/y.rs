@@ -39,12 +39,12 @@ pub fn y() -> Html {
             }
             for option_y in sorted_vec {
                 if option_y.0 != current_floor {
-                    let option: Element = document().create_element("option").unwrap();
-                    option.set_text_content(Some(&option_y.0));
-                    let _ = option.set_attribute("value", &option_y.0);
-    
-                    let _ = select.append_child(&option);
                 } 
+                let option: Element = document().create_element("option").unwrap();
+                option.set_text_content(Some(&option_y.0));
+                let _ = option.set_attribute("value", &option_y.0);
+
+                let _ = select.append_child(&option);
             }
 
             let target: EventTarget = select.clone().dyn_into::<EventTarget>().unwrap();
