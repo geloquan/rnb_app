@@ -31,6 +31,10 @@ pub struct SvgContentt {
     pub svg_content: Option<String>
 }
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
+pub struct SvgContentHighlighted {
+    pub svg_content: Option<String>
+}
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Properties)]
 pub struct OptionXY {
     pub x: Option<String>,
     pub y: Option<String>,
@@ -52,6 +56,7 @@ pub struct Entity {
     pub name: RefCell<String>,
     pub svg_raw_content: RefCell<Option<String>>,
     pub svg_content: RefCell<SvgContentt>,
+    pub svg_content_highlighted: RefCell<SvgContentHighlighted>,
     pub svg_content_app: Option<String>,
     pub default_floor: String,
     pub current_option: RefCell<OptionXY>,
@@ -81,8 +86,9 @@ impl Reducible for Entity {
                 match new_string {
                     Ok(string) => {
                         let mut tuple = Entity::mutate_to_highlight(&mut self);
-                        tuple.0.svg_content = Some(string.clone());
+                        //tuple.0.svg_content = Some(string.clone());
                         tuple.1.x = Some(highlight.clone());
+                        tuple.2.svg_content = Some(string.clone());
                     },
                     Err(e) => {
                         clog!(e);
@@ -90,7 +96,7 @@ impl Reducible for Entity {
                 }
             },
             EntityCase::ProduceOption(floor_str) => {
-                let new = self.clone().produce_option(floor_str).unwrap();
+                let new = self.clone().produce_option(floor_str.clone()).unwrap();
                 let new_string = new.0;
                 let new_option_x = new.1;
                 let new_option_y = new.2;
@@ -101,15 +107,21 @@ impl Reducible for Entity {
                 svg_content.1.data = Some(new_option_x);
                 svg_content.2.data = Some(new_option_y);
                 svg_content.3.data = Some(new_slots);
+                svg_content.4.y = floor_str;
+                svg_content.5.svg_content = None;
             },
         } 
         self
     }
 }
 impl Entity {
-    fn mutate_to_highlight<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionXY>) {
+    fn mutate_to_highlight<'a>(self: &'a mut Rc<Self>) -> (
+        impl 'a + DerefMut<Target = SvgContentt>, 
+        impl 'a + DerefMut<Target = OptionXY>, 
+        impl 'a + DerefMut<Target = SvgContentHighlighted>
+    ) {
         let this = Rc::make_mut(self);
-        (this.svg_content.borrow_mut(), this.current_option.borrow_mut())
+        (this.svg_content.borrow_mut(), this.current_option.borrow_mut(), this.svg_content_highlighted.borrow_mut())
     }
 
     fn mutate_floor<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = OptionXY> {
@@ -122,9 +134,16 @@ impl Entity {
         this.svg_content.borrow_mut()
     }
     
-    fn mutate_produce_option<'a>(self: &'a mut Rc<Self>) -> (impl 'a + DerefMut<Target = SvgContentt>, impl 'a + DerefMut<Target = OptionX>, impl 'a + DerefMut<Target = OptionY>, impl 'a + DerefMut<Target = ElementData>) {
+    fn mutate_produce_option<'a>(self: &'a mut Rc<Self>) -> (
+        impl 'a + DerefMut<Target = SvgContentt>, 
+        impl 'a + DerefMut<Target = OptionX>, 
+        impl 'a + DerefMut<Target = OptionY>, 
+        impl 'a + DerefMut<Target = ElementData>, 
+        impl 'a + DerefMut<Target = OptionXY>,
+        impl 'a + DerefMut<Target = SvgContentHighlighted>
+    ) {
         let this = Rc::make_mut(self);
-        (this.svg_content.borrow_mut(), this.x_option.borrow_mut(), this.y_option.borrow_mut(), this.element.borrow_mut())
+        (this.svg_content.borrow_mut(), this.x_option.borrow_mut(), this.y_option.borrow_mut(), this.element.borrow_mut(), this.current_option.borrow_mut(), this.svg_content_highlighted.borrow_mut())
     }
 
     fn mutate_option_x<'a>(self: &'a mut Rc<Self>) -> impl 'a + DerefMut<Target = OptionX> {
@@ -144,6 +163,7 @@ impl Entity {
             svg_raw_content: entity_response.svg_raw_content.into(),
             svg_content: SvgContentt {svg_content: None}.into(),
             svg_content_app: None,
+            svg_content_highlighted: SvgContentHighlighted {svg_content: None}.into(),
             default_floor: entity_response.default_floor,
             current_option: OptionXY {x: None, y: None}.into(),
             x_option: OptionX {data: None}.into(),
@@ -159,6 +179,7 @@ impl Entity {
             svg_raw_content: None.into(),
             svg_content: SvgContentt {svg_content: None}.into(),
             svg_content_app: None,
+            svg_content_highlighted: SvgContentHighlighted {svg_content: None}.into(),
             default_floor: "".to_string(),
             current_option: OptionXY {x: None, y: None}.into(),
             x_option: OptionX {data: None}.into(),
@@ -168,52 +189,33 @@ impl Entity {
             data_name: None,
         }
     }
-    pub fn get_all(&self) -> Self {
-        self.clone()
-    }
-    fn has_all_values(&self) -> bool {
-        self.name.borrow().is_empty() && 
-        self.svg_raw_content.borrow().is_some() && 
-        //self.svg_content.borrow().is_some() &&
-        self.default_floor != ""
-    }
-    pub fn produce_option_y(&self) -> Result<HashMap<String, String>, &'static str> {
-        let mut option = HashMap::new();
-        
-        Ok(option)
-    }
     fn process_string(input: &str) -> String {
         let re = Regex::new(r"-(\d+)(?:(_[^_]+)?|-[^-_]+)").unwrap();
         let mut found_number = false;
         
         re.replace_all(input, |caps: &regex::Captures| {
             if let Some(_) = caps.get(1) {
-                // Check if the number has already been found
                 if !found_number {
                     found_number = true;
-                    format!("-{}", &caps[1])  // Retain the first -[number]
+                    format!("-{}", &caps[1])  
                 } else {
-                    "".to_string()  // Remove any subsequent matches
+                    "".to_string()
                 }
             } else if let Some(_) = caps.get(2) {
-                "-_".to_string()  // Retain the -_ if present
+                "-_".to_string() 
             } else {
-                "".to_string()  // Remove anything else
+                "".to_string() 
             }
         }).to_string()
     }
     pub fn produce_option(& self, floor: Option<String>) -> Result<(String, HashMap<String, String>, HashMap<String, String>, HashMap<(String, String, Range<i32>), bool>), &'static str> {
         clog!("produce_option");
+        let style =  Regex::new(r#"style="([^"]*)""#).unwrap();
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
-        let floor_value = Regex::new(r#"floor\S*"#).unwrap();
-        let data_name_property = Regex::new(r#"data-name="([^"]+)""#).unwrap();
         let _shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
         let _class_value = Regex::new(r#"class="([^"]+)""#).unwrap();
         
-        let floor_value = Regex::new(r#"floor\S*"#).unwrap();
         let data_name_property = Regex::new(r#"id="([^"]+)""#).unwrap();
-
-        let g_element = Regex::new(r#"<\s*>\s*<g[^>]*>"#).unwrap();
         
         let focus_style = r#"style="stroke: blue !important""#;
         let unfocus_style = r#"style="stroke: none !important; fill: none !important""#;
@@ -286,8 +288,7 @@ impl Entity {
                     }
 
                     let equal_floor: bool = data_name_properties.iter().any(|data_name_value| {
-                        data_name_value == &floor.clone() ||
-                        data_name_value == &self.default_floor
+                        data_name_value == &floor
                     });
 
                     for data_name_value in data_name_properties.iter() {
@@ -298,19 +299,19 @@ impl Entity {
 
                     if equal_floor {
                         for data_name_value in data_name_properties.iter() {
-                            let mut borrow = self.x_option.borrow();
-                            match (self.default_floor.clone(), &floor_ref) {
-                                (_, floor) if !floor.is_empty() => {
-                                    x.insert(data_name_value.to_string(), floor.to_string());
-                                },
-                                (default_floor_, floor) if !floor.is_empty() => {
-                                    x.insert(data_name_value.to_string(), default_floor_.to_string());
-                                },
-                                (default_floor_, _) => {
-                                    x.insert(data_name_value.to_string(), default_floor_.to_string());
-                                }
-
-                            }
+                            clog!(format!("data_name_valuee: {:?}", data_name_value));
+                            x.insert(data_name_value.to_string(), floor.to_string());
+                            //match (self.default_floor.clone(), &floor_ref) {
+                            //    (_, floor) if !floor.is_empty() => {
+                            //    },
+                            //    (default_floor_, floor) if !floor.is_empty() => {
+                            //        x.insert(data_name_value.to_string(), default_floor_.to_string());
+                            //    },
+                            //    (default_floor_, _) => {
+                            //        x.insert(data_name_value.to_string(), default_floor_.to_string());
+                            //    }
+//
+                            //}
                         }
                     } 
                 }
@@ -340,31 +341,20 @@ impl Entity {
                 for unique_ranges_vece in &unique_ranges_vec {
                     let closing_bracket: Option<usize> = svg_raw_content.chars().skip(unique_ranges_vece.end as usize).position(|c| c == '>').map(|pos| pos + unique_ranges_vece.end as usize);
                     if let Some(closing_bracket) = closing_bracket {
-                        clog!(format!("closing_bracket0: {:?}", closing_bracket));
                         if unique_ranges_vece.end as usize <= closing_bracket && closing_bracket <= svg_raw_content.len() {
-                            clog!(format!("closing_bracket1: {:?}", closing_bracket));
                             let substring = &svg_raw_content[unique_ranges_vece.end as usize..closing_bracket];
-                            if let Some(pos) = substring.find(focus_style) {
-                                let replace_start = unique_ranges_vece.end as usize + pos;
-                                let replace_end = replace_start + focus_style.len();
-                                
-                                if to_focus_unique_ranges_vec.iter().any(|to_range| {
-                                    to_range.end == unique_ranges_vece.end
-                                }){
-                                    svg_raw_content.replace_range(replace_start..replace_end, focus_style);
-                                } else {
-                                    svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
-                                }
-                            } else if let Some(pos) = substring.find(unfocus_style) {
-                                let replace_start = unique_ranges_vece.end as usize + pos;
-                                let replace_end = replace_start + focus_style.len();
-                                
-                                if to_focus_unique_ranges_vec.iter().any(|to_range| {
-                                    to_range.end == unique_ranges_vece.end
-                                }){
-                                    svg_raw_content.replace_range(replace_start..replace_end, focus_style);
-                                } else {
-                                    svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
+                            if let Some(pos) = style.captures(substring) {
+                                if let Some(pos) = pos.get(0) {
+                                    let replace_start = unique_ranges_vece.end as usize + pos.start();
+                                    let replace_end = replace_start + focus_style.len();
+                                    
+                                    if to_focus_unique_ranges_vec.iter().any(|to_range| {
+                                        to_range.end == unique_ranges_vece.end
+                                    }){
+                                        svg_raw_content.replace_range(replace_start..replace_end, focus_style);
+                                    } else {
+                                        svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
+                                    }
                                 }
                             } else {
                                 if to_focus_unique_ranges_vec.iter().any(|to_range| {
@@ -379,34 +369,8 @@ impl Entity {
                         }
                     }
                 }
-                while let Some(ele) = sorted_elements.last() {
-                    //if to_focus_unique_ranges_vec.iter().any(|range| {
-                    //    if let Some(substring) = svg_raw_content.get(range.start as usize..range.end as usize) {
-                    //        clog!("Substring: {}", substring);
-                    //        if let Some(pos) = substring.find(focus_style) {
-                    //            let replace_start = range.start as usize + pos;
-                    //            let replace_end = replace_start + focus_style.len();
-                    //            
-                    //            svg_raw_content.replace_range(replace_start..replace_end, unfocus_style);
-                    //        }
-                    //    };
-                    //    range.contains(&(ele.0.2.end as i32)) ||
-                    //    range.end == ele.0.2.end as i32
-                    //}) {
-                    //    svg_raw_content.insert_str((ele.0.2.end).try_into().unwrap(), focus_style);
-                    //} else {
-                    //    svg_raw_content.insert_str((ele.0.2.end).try_into().unwrap(), unfocus_style);
-                    //}
-                    sorted_elements.pop();
-                }
-                    //if to_focus_unique_ranges_vec.contains(last_element) {
-                    //    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), focus_style);
-                    //} else {
-                    //    svg_raw_content.insert_str((last_element.end).try_into().unwrap(), unfocus_style);
-                    //}
             }
         }
-
         Ok((content.clone().unwrap_or("".to_string()), x.to_owned(), y.to_owned(), element.to_owned()))
     }
 

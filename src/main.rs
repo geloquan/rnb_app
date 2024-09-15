@@ -236,72 +236,45 @@ fn svg_data(code: &CodeProp) -> Html {
     
     let context = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let svg_content = context.svg_content.borrow();
-    
-    match &svg_content.svg_content {
-        Some(svge) => {
-            let div: Element = document().create_element("div").unwrap();
-            div.set_inner_html(svge);
+    let svg_content_highlighted = context.svg_content_highlighted.borrow();
+    let svge = if let Some(svge) = &svg_content_highlighted.svg_content {
+        svge
+    } else if let Some(svge) = &svg_content.svg_content {
+        svge
+    } else {
+        "upload svg"
+    };
 
-            let checker = {
-                let entity_ctx = context.clone();
-                let borrow = entity_ctx.borrow();
-                Callback::from(move |_| {
-                    let borrow = entity_ctx.borrow();
-                })
-            };
+    let div: Element = document().create_element("div").unwrap();
+    div.set_inner_html(svge);
 
-            let node: Node = div.into();
-            return html! {
-            <>
-                <button onclick={checker}> 
-                    {"check svg contente"} 
-                </button>
-                <div>
-                    {Html::VRef(node)}
-                </div>
-            </>
-            }
-        }
-        None => {
-            html! {
-                <div>
-                    {"upload svg"}
-                </div>
-            }
-        }
+    let node: Node = div.into();
+    return html! {
+    <>
+        <div>
+            {Html::VRef(node)}
+        </div>
+    </>
     }
 
-
-    //match entity_ctx {
-    //    Some(ref svg) => {
+    //match &svg_content.svg_content {
+    //    Some(svge) => {
     //        let div: Element = document().create_element("div").unwrap();
-    //        div.set_inner_html(svg);
-    //        //let target: EventTarget = div.clone().dyn_into::<EventTarget>().unwrap();
-    //        //let closure = Closure::wrap(Box::new(move |event: Event| {
-    //        //    web_sys::console::log_1(&"Event triggered".into());
-    //        //    
-    //        //}) as Box<dyn FnMut(_)>);
-////
-    //        //let clicked = {
-    //        //    Callback::from(move |event: Event| {
-    //        //    })
-    //        //};
-    //        //
-    //        //target
-    //        //.add_event_listener_with_callback("click", closure.as_ref().unchecked_ref())
-    //        //.unwrap();
-////
-    //        //closure.forget();
+    //        div.set_inner_html(svge);
 //
     //        let node: Node = div.into();
-    //        html! {
-    //            Html::VRef(node)
+    //        return html! {
+    //        <>
+    //            <div>
+    //                {Html::VRef(node)}
+    //            </div>
+    //        </>
     //        }
-    //    },
+    //    }
     //    None => {
     //        html! {
     //            <div>
-    //                {"upload svg"}
+    //                {""}
     //            </div>
     //        }
     //    }
