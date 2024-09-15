@@ -238,6 +238,20 @@ impl Entity {
         };
         let current_option = self.current_option.borrow().clone();
 
+        let floor: String = floor.clone().unwrap_or("".to_string());
+
+        let floor_ref: &str = floor.as_str();
+        
+        let floor = if &floor_ref != &"" {
+            &floor_ref
+        } else if &self.default_floor.as_str() != &"" {
+            &self.default_floor.as_str()
+        } else {
+            ""
+        };
+
+        clog!(format!("floor: {:?}", floor));
+
         if let Some(svg_raw_content) = &content {
             for some_data_name_property in data_name_property.captures_iter(&svg_raw_content) {
                 if let (Some(data_name_property), Some(data_name_value)) = (some_data_name_property.get(0), some_data_name_property.get(1)) {
@@ -261,17 +275,12 @@ impl Entity {
                     clog!(format!("data_name_value: {:?}", data_name_value));
                     clog!(format!("data_name_properties: {:?}", data_name_properties));
 
-                    let floor: String = floor.clone().unwrap_or("".to_string());
-
-                    let floor_ref: &str = floor.as_str();
-
-                    if data_name_properties.contains(&self.default_floor.as_str()) ||
-                    data_name_properties.contains(&floor_ref) 
-                    {
+                    if data_name_properties.contains(&floor) {
                         to_focus_ranges.push(start..end);
-                    } 
+                    };
 
                     ranges.push(start..end);
+
                     for data_name_property in &data_name_properties {
                         element.insert((data_name_value.as_str().to_string(), data_name_property.to_string(), start..end), true);
                     }
@@ -327,9 +336,6 @@ impl Entity {
             
             let mut sorted_elements: Vec<_> = element.clone().into_iter().collect();
             sorted_elements.sort_by(|a, b| a.0 .2.end.cmp(&b.0 .2.end));
-            clog!(format!("sorted elements: {:?}", sorted_elements));
-            clog!(format!("unique_ranges_vec: {:?}", unique_ranges_vec));
-            clog!(format!("to_focus_unique_ranges_vec: {:?}", to_focus_unique_ranges_vec));
             if let Some(ref mut svg_raw_content) = content {
                 for unique_ranges_vece in &unique_ranges_vec {
                     let closing_bracket: Option<usize> = svg_raw_content.chars().skip(unique_ranges_vece.end as usize).position(|c| c == '>').map(|pos| pos + unique_ranges_vece.end as usize);
