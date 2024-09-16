@@ -174,21 +174,11 @@ fn code(code: &CodeProp) -> Html {
         fill: "none !important".to_owned()
     });
     let fallback = html! {<div>{"Loading..."}</div>};
-    let checker = {
-        let entity_ctx = entity_ctx.clone();
-        let borrow = entity_ctx.borrow();
-        Callback::from(move |_| {
-            let borrow = entity_ctx.borrow();
-        })
-    };
     html! {
     <>    
         <ContextProvider<theme::Focus> context={(*focus).clone()}>
         <ContextProvider<theme::Unfocus> context={(*unfocus).clone()}>
         <ContextProvider<EntityContext> context={entity_ctx}>
-            <button onclick={checker}> 
-                {"check svg content"} 
-            </button>
             <Options/> 
             <SvgData code={code.code.clone()}/>
         </ContextProvider<EntityContext>>
@@ -203,24 +193,19 @@ fn svg_data(code: &CodeProp) -> Html {
     let code = code.code.clone();
     let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
     if entity_ctx.name.borrow().is_empty() {
-        clog!("is_empty()");
         spawn_local(async move {
             let svg_req = reqwasm::http::Request::get(
                 &format!("http://127.0.0.2:8081/{:?}", code)
             )
             .send()
             .await;
-            
-            
             match svg_req {
                 Ok(response) => {
                     if response.status_text() == "OK" {
-                        clog!("OK");
                         let body_text = response.text().await.expect("Failed to get body text");
                         let entity: Result<EntityResponse, serde_json::Error>  = serde_json::from_str(&body_text);
                         
-                        //clog!("OK");
-                        if let Ok(mut entity) = entity {
+                        if let Ok(entity) = entity {
                             let ent = entity::Entity::to_entity(entity);
                             entity_ctx.dispatch(EntityCase::Init(Some(ent)));
                             entity_ctx.dispatch(EntityCase::ProduceOption(None));
@@ -249,36 +234,21 @@ fn svg_data(code: &CodeProp) -> Html {
     div.set_inner_html(svge);
 
     let node: Node = div.into();
+
+    let scroll = {
+
+        Callback::from(move |e: MouseEvent| {
+            clog!("scrolled!");
+        })
+    };
     return html! {
     <>
-        <div>
+        
+        <div onclick={scroll}>
             {Html::VRef(node)}
         </div>
     </>
     }
-
-    //match &svg_content.svg_content {
-    //    Some(svge) => {
-    //        let div: Element = document().create_element("div").unwrap();
-    //        div.set_inner_html(svge);
-//
-    //        let node: Node = div.into();
-    //        return html! {
-    //        <>
-    //            <div>
-    //                {Html::VRef(node)}
-    //            </div>
-    //        </>
-    //        }
-    //    }
-    //    None => {
-    //        html! {
-    //            <div>
-    //                {""}
-    //            </div>
-    //        }
-    //    }
-    //}
 }
 //LINK - EditorLogin
 #[function_component(EditorLogin)]
@@ -354,8 +324,6 @@ fn editor_login() -> Html {
             </div>
             <button type="submit">{"Login"}</button>
         </form>
-        //<button onclick={dashboard_request}>{"request dashboard"}</button>
-        //<button onclick={oncheckuser}>{"check user"}</button>
         < Home />
         </>
     }
