@@ -1,10 +1,10 @@
 use core::borrow;
-use std::{borrow::{Borrow, BorrowMut}, cell::RefCell, collections::HashMap, ops::Deref, rc::Rc};
+use std::{borrow::{Borrow, BorrowMut}, cell::{Cell, RefCell}, collections::HashMap, ops::Deref, rc::Rc};
 
 use gloo_utils::document;
 use http::{header, HeaderMap, StatusCode};
 use wasm_bindgen::{prelude::Closure, JsCast, JsValue};
-use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlInputElement, Node, Storage};
+use web_sys::{js_sys::{self, Error, JSON}, window, Element, EventTarget, HtmlElement, HtmlInputElement, Node, Storage};
 use yew::{
     function_component, html, prelude::*, suspense::use_future, Html, Properties
 };
@@ -190,11 +190,11 @@ fn code(code: &CodeProp) -> Html {
 
 #[function_component(SvgData)]
 fn svg_data(code: &CodeProp) -> Html {
-    let code = code.code.clone();
-    let entity_ctx = use_context::<EntityContext>().expect("no Svg Content ctx found");
+    let code: String = code.code.clone();
+    let entity_ctx: UseReducerHandle<Entity> = use_context::<EntityContext>().expect("no Svg Content ctx found");
     if entity_ctx.name.borrow().is_empty() {
         spawn_local(async move {
-            let svg_req = reqwasm::http::Request::get(
+            let svg_req: Result<reqwasm::http::Response, reqwasm::Error> = reqwasm::http::Request::get(
                 &format!("http://127.0.0.2:8081/{:?}", code)
             )
             .send()
@@ -222,6 +222,101 @@ fn svg_data(code: &CodeProp) -> Html {
     let context = use_context::<EntityContext>().expect("no Svg Content ctx found");
     let svg_content = context.svg_content.borrow();
     let svg_content_highlighted = context.svg_content_highlighted.borrow();
+
+    let div: Element = document().create_element("div").unwrap();
+    let target: HtmlElement = div.clone().dyn_into::<HtmlElement>().unwrap();
+    let is_dragging: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+    let offset_x: Rc<Cell<i32>> = Rc::new(Cell::new(0));
+    let offset_y: Rc<Cell<i32>> = Rc::new(Cell::new(0));
+
+    let saved_left: Rc<Cell<i32>> = Rc::new(Cell::new(0)); // Initial left position
+    let saved_top: Rc<Cell<i32>> = Rc::new(Cell::new(0));  // Initial top position
+
+    {
+        let is_dragging_clone: Rc<Cell<bool>> = is_dragging.clone();
+        let offset_x_clone: Rc<Cell<i32>> = offset_x.clone();
+        let offset_y_clone: Rc<Cell<i32>> = offset_y.clone();
+        let saved_left_clone: Rc<Cell<i32>> = saved_left.clone();
+        let saved_top_clone: Rc<Cell<i32>> = saved_top.clone();
+
+        let on_mousedown = Closure::wrap(Box::new(move |event: MouseEvent| {
+            is_dragging_clone.set(true);
+    
+            offset_x_clone.set(event.client_x() - saved_left_clone.get());
+            offset_y_clone.set(event.client_y() - saved_top_clone.get());
+        }) as Box<dyn FnMut(_)>);
+
+            div.add_event_listener_with_callback("mousedown", on_mousedown.as_ref().unchecked_ref())
+            .unwrap();
+        on_mousedown.forget();
+    }
+
+    {
+        let target = target.clone();
+        let is_dragging_clone = is_dragging.clone();
+        let offset_x_clone = offset_x.clone();
+        let offset_y_clone = offset_y.clone();
+
+        let on_mousemove = Closure::wrap(Box::new(move |event: MouseEvent| {
+            if is_dragging_clone.get() {
+                let new_left = event.client_x() - offset_x_clone.get();
+                let new_top = event.client_y() - offset_y_clone.get();
+                target
+                .set_attribute("style", 
+                    &format!(
+                        "
+                            position: relative !important; 
+                            overflow: hidden;
+                            top: {}px;
+                            left: {}px;
+                            right: {}px;
+                        ", 
+                        new_top,
+                        new_left,
+                        -new_left 
+                    )
+                )
+                .unwrap();
+            }
+        }) as Box<dyn FnMut(_)>);
+
+        div
+            .add_event_listener_with_callback("mousemove", on_mousemove.as_ref().unchecked_ref())
+            .unwrap();
+        on_mousemove.forget();
+    }
+
+    {
+        let target = target.clone();
+        let is_dragging_clone = is_dragging.clone();
+        let saved_left_clone = saved_left.clone();
+        let saved_top_clone = saved_top.clone();
+
+        let on_mouseup = Closure::wrap(Box::new(move |_event: MouseEvent| {
+            is_dragging_clone.set(false);
+            let current_left = target.get_attribute("style")
+                .and_then(|style| {
+                    style.split(';')
+                        .find(|s| s.trim_start().starts_with("left:"))
+                        .map(|s| s.replace("left:", "").replace("px", "").trim().parse::<i32>().unwrap())
+                }).unwrap_or(0); 
+            let current_top = target.get_attribute("style")
+                .and_then(|style| {
+                    style.split(';')
+                        .find(|s| s.trim_start().starts_with("top:"))
+                        .map(|s| s.replace("top:", "").replace("px", "").trim().parse::<i32>().unwrap())
+                }).unwrap_or(0); 
+            
+            saved_left_clone.set(current_left);
+            saved_top_clone.set(current_top);
+        }) as Box<dyn FnMut(_)>);
+
+        div
+            .add_event_listener_with_callback("mouseup", on_mouseup.as_ref().unchecked_ref())
+            .unwrap();
+        on_mouseup.forget();
+    }
+
     let svge = if let Some(svge) = &svg_content_highlighted.svg_content {
         svge
     } else if let Some(svge) = &svg_content.svg_content {
@@ -230,23 +325,13 @@ fn svg_data(code: &CodeProp) -> Html {
         "upload svg"
     };
 
-    let div: Element = document().create_element("div").unwrap();
     div.set_inner_html(svge);
 
     let node: Node = div.into();
-
-    let scroll = {
-
-        Callback::from(move |e: MouseEvent| {
-            clog!("scrolled!");
-        })
-    };
+    
     return html! {
     <>
-        
-        <div onclick={scroll}>
-            {Html::VRef(node)}
-        </div>
+        {Html::VRef(node)}
     </>
     }
 }

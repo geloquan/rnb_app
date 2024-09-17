@@ -209,7 +209,6 @@ impl Entity {
         }).to_string()
     }
     pub fn produce_option(& self, floor: Option<String>) -> Result<(String, HashMap<String, String>, HashMap<String, String>, HashMap<(String, String, Range<i32>), bool>), &'static str> {
-        clog!("produce_option");
         let style =  Regex::new(r#"style="([^"]*)""#).unwrap();
         let _g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let _shape_tag = Regex::new(r#"<(polygon|rect|path)\b[^>]*>(.*?)"#).unwrap();
@@ -252,7 +251,6 @@ impl Entity {
             ""
         };
 
-        clog!(format!("floor: {:?}", floor));
 
         if let Some(svg_raw_content) = &content {
             for some_data_name_property in data_name_property.captures_iter(&svg_raw_content) {
@@ -273,9 +271,6 @@ impl Entity {
                     .split('_') 
                     .collect::<Vec<&str>>();
                     
-                    clog!(format!("data_name_property: {:?}", data_name_property));
-                    clog!(format!("data_name_value: {:?}", data_name_value));
-                    clog!(format!("data_name_properties: {:?}", data_name_properties));
 
                     if data_name_properties.contains(&floor) {
                         to_focus_ranges.push(start..end);
@@ -299,7 +294,6 @@ impl Entity {
 
                     if equal_floor {
                         for data_name_value in data_name_properties.iter() {
-                            clog!(format!("data_name_valuee: {:?}", data_name_value));
                             x.insert(data_name_value.to_string(), floor.to_string());
                             //match (self.default_floor.clone(), &floor_ref) {
                             //    (_, floor) if !floor.is_empty() => {
@@ -375,12 +369,10 @@ impl Entity {
     }
 
     pub fn highlight_option(& self, slot: Option<&str>) -> Result<String, &'static str> {
-        clog!("highlight_option");
 
         if slot.is_none() { return Err("nothing to process") }
         else if slot.unwrap() == self.focus_option.clone().unwrap_or("".to_string()) { return Err("nothing to process") }
         
-        clog!(format!("slot: {:?}", slot));
         
         let g_tag = Regex::new(r#"<g\b[^>]*>(.*?)<\/g>|<polygon\b[^>]*>(.*?)<\/polygon>|<g\b[^>]*\/>|<polygon\b[^>]*\/>"#).unwrap();
         let shape_tag = Regex::new(r#"<(polygon)\b[^>]*>(.*?)"#).unwrap();
