@@ -1,4 +1,4 @@
-# 3D Facility Plotting System for Multi-Object Neighboring Structures in 
+# 3D Facility Plotting System for Multi-Object Neighboring Structures in RUST!
 
 ### <code style="color: red"> Status: Abandoned </code>
 
