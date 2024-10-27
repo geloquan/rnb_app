@@ -1,6 +1,6 @@
 # 3D Facility Plotting System for Multi-Object Neighboring Structures in 
 
-### <code style"color: red"> Status: Abandoned </code>
+### <code style="color: red"> Status: Abandoned </code>
 
 ## Overview
 #### This project was originally intended to implement 3D joined object systems. However, due to limited manpower and technical challenges associated with 3D integration, the project has been discontinued.
